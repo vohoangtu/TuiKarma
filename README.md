@@ -8,8 +8,10 @@
 ## 🌟 Tính năng nổi bật
 
 - **Workflow Engine (DAG & Vòng lặp Tự sửa lỗi / Self-Healing)**:
-  - **Đồ thị luồng công việc linh hoạt (DAG & State Machine)**: Điều phối các bước theo nút (`AgentWorkflowNode`, `DecisionWorkflowNode`, `ToolWorkflowNode`).
+  - **Đồ thị luồng công việc linh hoạt (DAG & State Machine)**: Điều phối các bước theo nút (`AgentWorkflowNode`, `DecisionWorkflowNode`, `ToolWorkflowNode`, `ParallelWorkflowNode`).
+  - **Nhánh song song bất đồng bộ (Async Fork-Join DAG)**: Thực thi đồng thời nhiều Agent (`Coder` & `Tester`) qua `ParallelWorkflowNode` (`asyncio.gather`), sau đó hội tụ tại Gateway Join (`Critic`).
   - **Vòng lặp phản hồi tự chữa lành (Self-Healing Loop)**: Tự động bắt lỗi kiểm thử từ Tester và chuyển tiếp về Coder để viết bản vá, kiểm tra lại cho tới khi đạt chuẩn nghiệm thu.
+  - **Cơ chế Retry (3 lần x 30s) & Reverse Saga Rollback**: Tự động phục hồi snapshot file trên đĩa khi các bước thất bại.
   - **Blackboard State Management**: Chia sẻ ngữ cảnh giữa các bước qua đối tượng `WorkflowState`.
 - **Kiến trúc Hybrid Swarm + Antigravity Gateway**:
   - 👑 **Supervisor**: (`antigravity/claude-sonnet-4-6`) Lập kế hoạch, phân rã mục tiêu và tổng hợp nghiệm thu.
@@ -51,8 +53,11 @@ Hoặc ép dùng backend cụ thể:
 # Chạy với Antigravity Local Gateway (http://localhost:20128/v1)
 .\.venv\Scripts\python.exe main.py --backend local
 
-# Chạy với Declarative YAML Workflow Pipeline
+# Chạy với Declarative YAML Workflow Pipeline (Self-Healing)
 .\.venv\Scripts\python.exe main.py --workflow tasks/pipelines/self_healing_coding.yaml --backend scenario
+
+# Chạy với Parallel Fork-Join TDD Pipeline (Coder & Tester chạy song song)
+.\.venv\Scripts\python.exe main.py --workflow tasks/pipelines/parallel_tdd_pipeline.yaml --backend scenario
 
 # Chạy offline / mock deterministic (không cần gateway)
 .\.venv\Scripts\python.exe main.py --backend scenario
@@ -61,7 +66,7 @@ Hoặc ép dùng backend cụ thể:
 ### 3. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
 ```powershell
 # Chạy benchmark tự động với Live Antigravity Models hoặc YAML Pipeline
-.\.venv\Scripts\python.exe main.py --no-tui --workflow tasks/pipelines/self_healing_coding.yaml --backend scenario
+.\.venv\Scripts\python.exe main.py --no-tui --workflow tasks/pipelines/parallel_tdd_pipeline.yaml --backend scenario
 ```
 
 ### 4. Phát lại phiên làm việc đã lưu (Replay Mode)
@@ -69,7 +74,7 @@ Hoặc ép dùng backend cụ thể:
 .\.venv\Scripts\python.exe main.py --replay traces/session_20261009_125925.jsonl
 ```
 
-### 5. Chạy toàn bộ bộ kiểm thử tự động (20 Unit Tests & UI Pilot Tests)
+### 5. Chạy toàn bộ bộ kiểm thử tự động (23 Unit Tests & UI Pilot Tests)
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
@@ -100,13 +105,15 @@ TUIKarma/
 ├── tasks/
 │   ├── example_task.yaml       # Kịch bản benchmark mẫu
 │   └── pipelines/
-│       └── self_healing_coding.yaml # Khai báo Declarative DAG Workflow bằng YAML
+│       ├── self_healing_coding.yaml   # Khai báo Declarative DAG Workflow bằng YAML
+│       └── parallel_tdd_pipeline.yaml # Khai báo Declarative Fork-Join Parallel Pipeline
 ├── sandbox_workspace/          # Không gian làm việc sandbox cô lập của Agents
 ├── traces/                     # Nhật ký lưu trữ session trajectory (.jsonl)
 ├── tests/
 │   ├── test_harness.py         # Unit tests cho bus, agent, tools, evaluator, replay
 │   ├── test_ui.py              # Textual pilot tests cho giao diện TUI & DAG widget
 │   ├── test_workflow.py        # Unit tests cho DAGs, cycles, retries và saga rollback
+│   ├── test_parallel_workflow.py # Unit tests cho ParallelFork-Join DAG
 │   ├── test_sandbox_snapshot.py# Unit tests cho Snapshot & phục hồi file trên đĩa
 │   ├── test_workflow_parser.py # Unit tests cho parser YAML pipeline
 │   └── test_hitl_controls.py   # Unit tests cho các lệnh can thiệp HITL

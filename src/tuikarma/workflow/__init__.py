@@ -6,6 +6,7 @@ from tuikarma.workflow.node import (
     AgentWorkflowNode,
     DecisionWorkflowNode,
     ToolWorkflowNode,
+    ParallelWorkflowNode,
 )
 from tuikarma.workflow.edge import WorkflowEdge
 from tuikarma.workflow.engine import WorkflowEngine
@@ -19,6 +20,7 @@ __all__ = [
     "AgentWorkflowNode",
     "DecisionWorkflowNode",
     "ToolWorkflowNode",
+    "ParallelWorkflowNode",
     "WorkflowEdge",
     "WorkflowEngine",
     "build_self_healing_coding_workflow",

@@ -1,0 +1,53 @@
+# Declarative Fork-Join Parallel Pipeline: Coder & Tester run in parallel, then Join at Review
+name: "Parallel Fork-Join TDD Pipeline"
+max_steps: 10
+default_retry_policy:
+  max_retries: 3
+  delay_seconds: 30.0
+
+nodes:
+  - id: "plan"
+    name: "Lập kế hoạch kiến trúc"
+    type: "agent"
+    agent: "Supervisor"
+    prompt: "Mục tiêu: {task_description}. Hãy phân tích yêu cầu kiến trúc và phác thảo API spec cho Coder và Tester."
+    is_start: true
+
+  - id: "parallel_dev"
+    name: "Phát triển Core & Test Suite song song (Fork)"
+    type: "parallel"
+    branches:
+      - id: "code"
+        name: "Triển khai mã nguồn Core"
+        type: "agent"
+        agent: "Coder"
+        prompt: "Dựa trên kế hoạch: {plan}. Hãy viết mã nguồn đầy đủ, type annotations và dùng write_file lưu vào sandbox."
+      - id: "test_suite"
+        name: "Soạn thảo kịch bản kiểm thử TDD"
+        type: "agent"
+        agent: "Tester"
+        prompt: "Dựa trên kế hoạch: {plan}. Hãy thiết kế unit tests, dùng write_file lưu vào tests/test_limiter.py."
+
+  - id: "review"
+    name: "Đánh giá chất lượng & Hợp nhất (Join Gateway)"
+    type: "agent"
+    agent: "Critic"
+    prompt: "Đã có code ({code}) và test ({test_suite}). Hãy phân tích tính tương thích giữa code và test, đánh giá bảo mật."
+
+  - id: "synthesize"
+    name: "Tổng kết & Nghiệm thu"
+    type: "agent"
+    agent: "Supervisor"
+    prompt: "Kết quả đánh giá: {review}. Hãy nghiệm thu toàn bộ giải pháp."
+    is_end: true
+
+edges:
+  - from: "plan"
+    to: "parallel_dev"
+    name: "Kế hoạch -> Nhánh song song Fork"
+  - from: "parallel_dev"
+    to: "review"
+    name: "Hội tụ Join -> Critic Review"
+  - from: "review"
+    to: "synthesize"
+    name: "Review -> Nghiệm thu cuối"

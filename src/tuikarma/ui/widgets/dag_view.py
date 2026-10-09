@@ -69,7 +69,9 @@ class WorkflowDAGWidget(Static):
         nid = event.node_id
         if nid not in self.node_order:
             self.node_order.append(nid)
-        self.node_states.setdefault(nid, {})["status"] = "RUNNING"
+        st_dict = self.node_states.setdefault(nid, {})
+        st_dict["status"] = "RUNNING"
+        st_dict["type"] = event.node_type
         self.active_node = nid
         self.render_graph()
 
@@ -114,6 +116,7 @@ class WorkflowDAGWidget(Static):
 
         for i, nid in enumerate(self.node_order):
             st = self.node_states.get(nid, {}).get("status", "PENDING")
+            ntype = self.node_states.get(nid, {}).get("type", "")
             attempt = self.node_states.get(nid, {}).get("attempt", 0)
             max_r = self.node_states.get(nid, {}).get("max_retries", 3)
             delay = self.node_states.get(nid, {}).get("delay", 30.0)
@@ -121,9 +124,13 @@ class WorkflowDAGWidget(Static):
             if st == "PENDING":
                 badge = f"[dim cyan]○ {nid}[/dim cyan]"
             elif st == "RUNNING":
-                badge = f"[bold bright_yellow on #1f2937] ▶ {nid} [/bold bright_yellow on #1f2937]"
+                if ntype == "parallel":
+                    badge = f"[bold bright_cyan on #1e3a5f] ⫽ {nid} (PARALLEL) [/bold bright_cyan on #1e3a5f]"
+                else:
+                    badge = f"[bold bright_yellow on #1f2937] ▶ {nid} [/bold bright_yellow on #1f2937]"
             elif st == "SUCCESS":
-                badge = f"[bold green]✔ {nid}[/bold green]"
+                suffix = " (⫽)" if ntype == "parallel" else ""
+                badge = f"[bold green]✔ {nid}{suffix}[/bold green]"
             elif st == "SKIPPED":
                 badge = f"[bold yellow]⤼ {nid} (skip)[/bold yellow]"
             elif st == "RETRYING":

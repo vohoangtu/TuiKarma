@@ -3,8 +3,9 @@
 from __future__ import annotations
 import time
 import inspect
+import asyncio
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Callable, Awaitable, Union
+from typing import Dict, Any, Optional, Callable, Awaitable, Union, List
 
 from tuikarma.core.agent import Agent
 from tuikarma.core.events import MetricsEvent
@@ -226,3 +227,83 @@ class ToolWorkflowNode(BaseWorkflowNode):
                 error_message=str(e),
                 metadata={"tool_name": self.tool.name, "error": str(e)}
             )
+
+
+class ParallelWorkflowNode(BaseWorkflowNode):
+    """Executes multiple child workflow nodes concurrently (Async Fork-Join pattern)."""
+
+    def __init__(
+        self,
+        node_id: str,
+        name: str,
+        branches: List[BaseWorkflowNode],
+        max_retries: int = 3,
+        retry_delay_seconds: float = 30.0,
+        rollback_handler: Optional[Callable[[WorkflowState], Union[None, Awaitable[None]]]] = None,
+    ) -> None:
+        super().__init__(
+            node_id=node_id,
+            name=name,
+            node_type="parallel",
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
+            rollback_handler=rollback_handler,
+        )
+        self.branches = branches
+
+    async def execute(self, state: WorkflowState) -> NodeResult:
+        """Executes all branch nodes concurrently via asyncio.gather and aggregates outputs."""
+        results = await asyncio.gather(
+            *(branch.execute(state) for branch in self.branches),
+            return_exceptions=True
+        )
+
+        combined_outputs: Dict[str, Any] = {}
+        all_success = True
+        error_messages: List[str] = []
+
+        for branch, res in zip(self.branches, results):
+            if isinstance(res, Exception):
+                all_success = False
+                err_str = f"Branch '{branch.node_id}' raised exception: {res}"
+                error_messages.append(err_str)
+                state.set_output(branch.node_id, f"Error: {res}")
+            elif isinstance(res, NodeResult):
+                state.set_output(branch.node_id, res.output)
+                combined_outputs[branch.node_id] = res.output
+                if not res.success:
+                    all_success = False
+                    error_messages.append(f"Branch '{branch.node_id}': {res.error_message or 'Failed'}")
+                else:
+                    state.mark_completed(branch.node_id)
+            else:
+                combined_outputs[branch.node_id] = res
+
+        if not all_success:
+            return NodeResult(
+                node_id=self.node_id,
+                success=False,
+                output=combined_outputs,
+                error_message="; ".join(error_messages)
+            )
+
+        return NodeResult(
+            node_id=self.node_id,
+            success=True,
+            output=combined_outputs,
+            metadata={"branches": [b.node_id for b in self.branches]}
+        )
+
+    async def rollback(self, state: WorkflowState) -> None:
+        """Compensates all parallel branches in reverse order."""
+        if self.rollback_handler:
+            if inspect.iscoroutinefunction(self.rollback_handler):
+                await self.rollback_handler(state)
+            else:
+                self.rollback_handler(state)
+        else:
+            for branch in reversed(self.branches):
+                await branch.rollback(state)
+            if self.node_id in state.node_outputs:
+                del state.node_outputs[self.node_id]
+
