@@ -140,10 +140,24 @@ Khởi chạy kèm với workflow pipeline tự chọn:
 .\.venv\Scripts\python.exe main.py --replay traces/session_20261009_125925.jsonl
 ```
 
-### 8. Chạy toàn bộ bộ kiểm thử tự động (42 Unit Tests & Full Stack Tests)
+### 8. Chạy toàn bộ bộ kiểm thử tự động (49 Unit Tests & Full Stack Tests)
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
+
+---
+
+## 🕸️ Tích hợp Graphify: Code Knowledge Graph & Impact Analysis
+
+Hệ thống được tích hợp động cơ **Graphify** (Tree-sitter AST Parsing + NetworkX Graph Analysis) giúp đàn Agent có bản đồ tri thức toàn cảnh về cấu trúc mã nguồn:
+1. **Công cụ Agent `code_graph`**:
+   - `action="summary"`: Tổng quan số lượng Nodes, Edges, God Nodes (các trung tâm kiến trúc có độ kết nối cao nhất), và Import Cycles.
+   - `action="query", symbol="Tên_Lớp_Hoặc_Hàm"`: Tra cứu toàn bộ liên kết trực tiếp (hàm gọi, hàm được gọi, imports).
+   - `action="path", symbol="ModuleA", target_symbol="ModuleB"`: Tìm đường đi ngắn nhất giữa hai thành phần kiến trúc.
+   - `action="impact", symbol="Tên_Symbol"`: **Phân tích Tác động (Blast Radius)** — xác định chính xác những component nào sẽ bị ảnh hưởng nếu sửa đổi mã nguồn.
+   - `action="cycles"`: Phát hiện các chu trình vòng lặp phụ thuộc (circular imports) tiềm ẩn rủi ro.
+2. **Giao diện Trực quan hóa Web Dashboard**:
+   - Tab **`🕸️ Đồ thị Kiến trúc (Graphify)`**: Tra cứu symbol, bấm xem danh sách God Nodes, và mở **Đồ thị Tương tác 2D/3D Toàn màn hình (`/api/graph/view`)**.
 
 ---
 
@@ -185,6 +199,7 @@ TUIKarma/
 │   ├── test_dynamic_routing_and_hitl.py # Unit tests cho Dynamic Expression Routing & HITL
 │   ├── test_web_server.py      # Unit tests cho Light Fluent 2 Mica Web UI & REST/WS APIs
 │   ├── test_autopilot_and_project.py # Unit tests cho Project Workspace & AutoPilot Engine
+│   ├── test_code_graph.py      # Unit tests cho Graphify Code Knowledge Graph & APIs
 │   ├── test_sandbox_snapshot.py# Unit tests cho Snapshot & phục hồi file trên đĩa
 │   ├── test_workflow_parser.py # Unit tests cho parser YAML pipeline
 │   └── test_hitl_controls.py   # Unit tests cho các lệnh can thiệp HITL
@@ -202,6 +217,8 @@ TUIKarma/
         │   └── manager.py      # Quản lý Project Workspace, scan codebase, browse thư mục
         ├── memory/
         │   └── reflexion.py    # Tích lũy tri thức, đúc kết kinh nghiệm & prompt injection
+        ├── graph/
+        │   └── engine.py       # CodeKnowledgeGraphEngine tích hợp Graphify & Tree-sitter AST
         ├── workflow/
         │   ├── state.py        # WorkflowState & NodeResult (Blackboard pattern)
         │   ├── node.py         # Agent, Decision, Tool, Parallel, và HITL Workflow Nodes
@@ -220,6 +237,7 @@ TUIKarma/
         │   ├── base.py         # BaseTool & ToolRegistry
         │   ├── filesystem.py   # Sandboxed Read/Write/List file tools
         │   ├── runner.py       # Isolated Python/CLI execution tools với security gate
+        │   ├── graph.py        # CodeGraphTool truy vấn kiến trúc, path & impact analysis
         │   └── snapshot.py     # SandboxSnapshotManager quản lý checkpoint/restore file đĩa
         ├── harness/
         │   ├── task.py         # TaskSpec & Evaluation criteria

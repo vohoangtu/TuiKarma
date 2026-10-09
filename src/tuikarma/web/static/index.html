@@ -304,6 +304,7 @@
           <button type="button" class="tab-btn" data-tab="tab-inspector">⚙️ Tool Inspector</button>
           <button type="button" class="tab-btn" data-tab="tab-sandbox">📁 Mã nguồn Workspace</button>
           <button type="button" class="tab-btn" data-tab="tab-memory">🧠 Trí nhớ Tích lũy (Reflexion)</button>
+          <button type="button" class="tab-btn" data-tab="tab-graph">🕸️ Đồ thị Kiến trúc (Graphify)</button>
         </div>
 
         <!-- Tab 1: Live Dialogue -->
@@ -348,6 +349,62 @@
           </div>
           <div class="lessons-grid" id="lessons-grid">
             <!-- Rendered lesson cards -->
+          </div>
+        </div>
+
+        <!-- Tab 5: Code Knowledge Graph (Graphify) -->
+        <div class="tab-content" id="tab-graph">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div>
+              <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">Đồ thị Tri thức Mã nguồn (Graphify AST Knowledge Graph)</div>
+              <div style="font-size: 0.76rem; color: var(--text-secondary);">Trích xuất cấu trúc quan hệ, phân tích khớp nối (Coupling) và kiểm soát rủi ro kiến trúc.</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn-fluent" id="btn-refresh-graph" style="font-size: 0.75rem;">🔄 Quét lại Graph</button>
+              <a href="/api/graph/view" target="_blank" class="btn-primary" id="btn-open-graph-visualizer" style="font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                <span>🌐</span> Xem Trực quan 2D/3D
+              </a>
+            </div>
+          </div>
+
+          <!-- Summary Metrics Cards -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;" id="graph-metrics-row">
+            <div class="telemetry-pill" style="justify-content: center; flex-direction: column; align-items: flex-start; padding: 10px;">
+              <span class="label">Tổng số Nodes</span>
+              <span class="value" id="graph-nodes-count">0</span>
+            </div>
+            <div class="telemetry-pill" style="justify-content: center; flex-direction: column; align-items: flex-start; padding: 10px;">
+              <span class="label">Tổng số Edges</span>
+              <span class="value" id="graph-edges-count">0</span>
+            </div>
+            <div class="telemetry-pill" style="justify-content: center; flex-direction: column; align-items: flex-start; padding: 10px;">
+              <span class="label">God Nodes (Cốt lõi)</span>
+              <span class="value" id="graph-gods-count">0</span>
+            </div>
+            <div class="telemetry-pill" style="justify-content: center; flex-direction: column; align-items: flex-start; padding: 10px;">
+              <span class="label">Chu trình Vòng lặp</span>
+              <span class="value" id="graph-cycles-count" style="color: var(--status-success);">0 cycles</span>
+            </div>
+          </div>
+
+          <!-- Interactive Symbol Query & Impact Analysis -->
+          <div style="background: rgba(255,255,255,0.85); border: 1px solid var(--fluent-border-subtle); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 8px;">🔍 Tra cứu & Phân tích Tác động (Blast Radius):</div>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" class="fluent-input" id="graph-symbol-input" placeholder="Nhập tên class/hàm/module (ví dụ: Agent, WorkflowState)..." style="flex: 1;">
+              <button type="button" class="btn-fluent" id="btn-graph-query">Tra cứu Quan hệ</button>
+              <button type="button" class="btn-primary" id="btn-graph-impact">⚡ Phân tích Tác động</button>
+            </div>
+            <div id="graph-query-result" style="margin-top: 10px; font-family: var(--font-family-mono); font-size: 0.78rem; max-height: 220px; overflow-y: auto; background: #fff; border: 1px solid var(--fluent-border-subtle); border-radius: var(--radius-sm); padding: 8px; display: none;">
+            </div>
+          </div>
+
+          <!-- God Nodes List -->
+          <div style="background: rgba(255,255,255,0.85); border: 1px solid var(--fluent-border-subtle); border-radius: var(--radius-md); padding: 12px;">
+            <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 6px;">👑 Top Trung tâm Kiến trúc (God Nodes):</div>
+            <div id="graph-god-nodes-list" style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span style="font-size: 0.75rem; color: var(--text-tertiary);">Đang tải thông tin...</span>
+            </div>
           </div>
         </div>
       </div>

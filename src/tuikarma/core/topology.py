@@ -19,6 +19,7 @@ from tuikarma.core.llm import BaseLLMProvider, get_default_llm_provider
 from tuikarma.tools.base import ToolRegistry
 from tuikarma.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
 from tuikarma.tools.runner import ExecutePythonTool, RunCommandTool
+from tuikarma.tools.graph import CodeGraphTool
 
 
 class SwarmTopology:
@@ -54,6 +55,7 @@ class SwarmTopology:
         self.tools.register(ListDirTool(workspace_root=self.workspace_dir))
         self.tools.register(ExecutePythonTool(workspace_root=self.workspace_dir))
         self.tools.register(RunCommandTool(workspace_root=self.workspace_dir, requires_approval=True))
+        self.tools.register(CodeGraphTool(workspace_root=self.workspace_dir))
 
     def _setup_default_swarm(self) -> None:
         """Initialize the standard modern swarm: Supervisor, Coder, Tester, Critic."""

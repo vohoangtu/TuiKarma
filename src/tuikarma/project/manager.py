@@ -177,6 +177,15 @@ class ProjectManager:
         from collections import Counter
         counts = Counter(suffixes)
 
+        # Code Knowledge Graph extraction via Graphify
+        graph_summary = None
+        try:
+            from tuikarma.graph.engine import CodeKnowledgeGraphEngine
+            graph_engine = CodeKnowledgeGraphEngine(base)
+            graph_summary = graph_engine.get_summary()
+        except Exception as e:
+            logger.debug(f"Code Knowledge Graph scan skipped: {e}")
+
         return {
             "root_path": str(base),
             "project_name": base.name,
@@ -184,6 +193,7 @@ class ProjectManager:
             "files_sample": collected_files[:60],
             "key_configs": key_configs,
             "file_types": dict(counts.most_common(5)),
+            "code_graph": graph_summary,
         }
 
     @staticmethod

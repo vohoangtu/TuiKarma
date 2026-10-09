@@ -3,6 +3,7 @@
 from tuikarma.tools.base import BaseTool, ToolRegistry
 from tuikarma.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
 from tuikarma.tools.runner import ExecutePythonTool, RunCommandTool
+from tuikarma.tools.graph import CodeGraphTool
 
 __all__ = [
     "BaseTool",
@@ -12,4 +13,5 @@ __all__ = [
     "ListDirTool",
     "ExecutePythonTool",
     "RunCommandTool",
+    "CodeGraphTool",
 ]

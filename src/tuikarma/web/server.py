@@ -400,6 +400,48 @@ async def start_autopilot(req: AutoPilotRequest):
     return await manager.start_autopilot(req)
 
 
+def _get_active_graph_engine():
+    from tuikarma.graph.engine import CodeKnowledgeGraphEngine
+    if manager.active_project and Path(manager.active_project.path).exists():
+        target = Path(manager.active_project.path)
+    else:
+        target = manager.topology.workspace_dir
+    return CodeKnowledgeGraphEngine(target)
+
+
+@app.get("/api/graph/summary")
+async def get_graph_summary():
+    engine = _get_active_graph_engine()
+    return engine.get_summary()
+
+
+@app.get("/api/graph/query")
+async def query_graph_symbol(symbol: str = Query(...)):
+    engine = _get_active_graph_engine()
+    return engine.query_symbol(symbol)
+
+
+@app.get("/api/graph/path")
+async def find_graph_path(source: str = Query(...), target: str = Query(...)):
+    engine = _get_active_graph_engine()
+    return engine.find_path(source, target)
+
+
+@app.get("/api/graph/impact")
+async def analyze_graph_impact(symbol: str = Query(...), depth: int = Query(2)):
+    engine = _get_active_graph_engine()
+    return engine.impact_analysis(symbol, max_depth=depth)
+
+
+@app.get("/api/graph/view")
+async def view_graph_html():
+    engine = _get_active_graph_engine()
+    html_path = engine.export_interactive_html()
+    if html_path and html_path.exists():
+        return FileResponse(html_path, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Không thể tạo file HTML trực quan hóa đồ thị (chưa có code files).")
+
+
 @app.get("/api/pipelines")
 async def get_pipelines():
     pipeline_dir = Path("tasks/pipelines")

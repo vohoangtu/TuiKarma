@@ -38,4 +38,5 @@ traces/*.jsonl
 !traces/.gitkeep
 projects/*/
 !projects/projects_registry.json
+graphify-out/
 

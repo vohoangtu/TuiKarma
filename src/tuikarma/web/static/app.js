@@ -95,6 +95,18 @@ class TUIKarmaWebClient {
     this.lessonsGrid = document.getElementById("lessons-grid");
     this.btnRefreshLessons = document.getElementById("btn-refresh-lessons");
 
+    // Code Knowledge Graph (Graphify) Tab
+    this.graphNodesCount = document.getElementById("graph-nodes-count");
+    this.graphEdgesCount = document.getElementById("graph-edges-count");
+    this.graphGodsCount = document.getElementById("graph-gods-count");
+    this.graphCyclesCount = document.getElementById("graph-cycles-count");
+    this.graphSymbolInput = document.getElementById("graph-symbol-input");
+    this.btnGraphQuery = document.getElementById("btn-graph-query");
+    this.btnGraphImpact = document.getElementById("btn-graph-impact");
+    this.graphQueryResult = document.getElementById("graph-query-result");
+    this.graphGodNodesList = document.getElementById("graph-god-nodes-list");
+    this.btnRefreshGraph = document.getElementById("btn-refresh-graph");
+
     // Folder Browser Modal
     this.folderBrowserModal = document.getElementById("folder-browser-modal");
     this.currentBrowserPath = document.getElementById("current-browser-path");
@@ -279,8 +291,20 @@ class TUIKarmaWebClient {
         if (targetEl) targetEl.classList.add("active");
         if (targetId === "tab-sandbox") this.fetchSandboxFiles();
         if (targetId === "tab-memory") this.fetchLessons();
+        if (targetId === "tab-graph") this.fetchGraphSummary();
       });
     });
+
+    // Graphify Tab Action Buttons
+    if (this.btnRefreshGraph) {
+      this.btnRefreshGraph.addEventListener("click", () => this.fetchGraphSummary());
+    }
+    if (this.btnGraphQuery) {
+      this.btnGraphQuery.addEventListener("click", () => this.handleGraphQuery());
+    }
+    if (this.btnGraphImpact) {
+      this.btnGraphImpact.addEventListener("click", () => this.handleGraphImpact());
+    }
   }
 
   initWebSocket() {
@@ -818,6 +842,129 @@ class TUIKarmaWebClient {
     this.isPaused = !this.isPaused;
     this.btnPause.textContent = this.isPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng";
     this.sendHITLCommand(this.isPaused ? "PAUSE" : "RESUME");
+  }
+
+  /* ========================================================================
+     Graphify Code Knowledge Graph Handlers
+     ======================================================================== */
+
+  async fetchGraphSummary() {
+    try {
+      const res = await fetch("/api/graph/summary");
+      const data = await res.json();
+      if (!data.available) {
+        if (this.graphQueryResult) {
+          this.graphQueryResult.style.display = "block";
+          this.graphQueryResult.textContent = "Graphify chưa sẵn sàng hoặc không tìm thấy mã nguồn.";
+        }
+        return;
+      }
+
+      if (this.graphNodesCount) this.graphNodesCount.textContent = data.total_nodes.toLocaleString();
+      if (this.graphEdgesCount) this.graphEdgesCount.textContent = data.total_edges.toLocaleString();
+      if (this.graphGodsCount) this.graphGodsCount.textContent = (data.god_nodes || []).length;
+      if (this.graphCyclesCount) {
+        const cyclesLen = (data.import_cycles || []).length;
+        this.graphCyclesCount.textContent = `${cyclesLen} cycles`;
+        this.graphCyclesCount.style.color = cyclesLen > 0 ? "var(--status-danger)" : "var(--status-success)";
+      }
+
+      if (this.graphGodNodesList) {
+        this.graphGodNodesList.innerHTML = "";
+        if (!data.god_nodes || data.god_nodes.length === 0) {
+          this.graphGodNodesList.innerHTML = `<span style="font-size: 0.75rem; color: var(--text-tertiary);">Chưa phát hiện God node nào.</span>`;
+        } else {
+          data.god_nodes.forEach((g) => {
+            const badge = document.createElement("span");
+            badge.className = "brand-badge";
+            badge.style.cursor = "pointer";
+            badge.style.fontSize = "0.74rem";
+            badge.textContent = `👑 ${g.label || g.id} (${g.degree} liên kết)`;
+            badge.addEventListener("click", () => {
+              if (this.graphSymbolInput) {
+                this.graphSymbolInput.value = g.label || g.id;
+                this.handleGraphQuery();
+              }
+            });
+            this.graphGodNodesList.appendChild(badge);
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Fetch graph summary error:", err);
+    }
+  }
+
+  async handleGraphQuery() {
+    const symbol = this.graphSymbolInput ? this.graphSymbolInput.value.trim() : "";
+    if (!symbol) {
+      alert("Vui lòng nhập tên class, hàm hoặc module để tra cứu.");
+      return;
+    }
+
+    if (this.graphQueryResult) {
+      this.graphQueryResult.style.display = "block";
+      this.graphQueryResult.textContent = `⌛ Đang tra cứu quan hệ cho '${symbol}'...`;
+    }
+
+    try {
+      const res = await fetch(`/api/graph/query?symbol=${encodeURIComponent(symbol)}`);
+      const data = await res.json();
+      if (!data.found) {
+        this.graphQueryResult.textContent = `❌ ${data.message || "Không tìm thấy symbol trong đồ thị."}`;
+        return;
+      }
+
+      let out = `📌 Symbol: ${data.label} (ID: ${data.id})\n`;
+      out += `📁 Tệp tin: ${data.file || "N/A"} ${data.location ? `[${data.location}]` : ""}\n`;
+      out += `🔗 Bậc liên kết (Degree): ${data.degree} (${data.connections_count} kết nối)\n\n`;
+      out += `DANH SÁCH LIÊN KẾT TRỰC TIẾP:\n`;
+      (data.connections || []).forEach((c, idx) => {
+        out += `${idx + 1}. [${c.relation}] ➔ ${c.label} (${c.file || "external"})\n`;
+      });
+
+      this.graphQueryResult.textContent = out;
+    } catch (err) {
+      this.graphQueryResult.textContent = `Lỗi tra cứu đồ thị: ${err}`;
+    }
+  }
+
+  async handleGraphImpact() {
+    const symbol = this.graphSymbolInput ? this.graphSymbolInput.value.trim() : "";
+    if (!symbol) {
+      alert("Vui lòng nhập tên class, hàm hoặc module để phân tích tác động.");
+      return;
+    }
+
+    if (this.graphQueryResult) {
+      this.graphQueryResult.style.display = "block";
+      this.graphQueryResult.textContent = `⚡ Đang tính toán phạm vi ảnh hưởng (Blast Radius) khi sửa '${symbol}'...`;
+    }
+
+    try {
+      const res = await fetch(`/api/graph/impact?symbol=${encodeURIComponent(symbol)}&depth=2`);
+      const data = await res.json();
+      if (!data.found) {
+        this.graphQueryResult.textContent = `❌ ${data.message || "Không tìm thấy symbol."}`;
+        return;
+      }
+
+      let out = `⚡ KẾT QUẢ PHÂN TÍCH TÁC ĐỘNG (BLAST RADIUS):\n`;
+      out += `🎯 Mục tiêu: ${data.target_symbol} (Node: ${data.target_node})\n`;
+      out += `⚠ Mức độ rủi ro (Risk Level): [${data.risk_level}]\n`;
+      out += `📊 Tổng số thành phần bị ảnh hưởng: ${data.total_affected_components}\n\n`;
+
+      (data.depth_layers || []).forEach((layer, lIdx) => {
+        out += `--- Cấp độ ảnh hưởng ${lIdx + 1} (${layer.length} thành phần) ---\n`;
+        layer.forEach((item, idx) => {
+          out += `  • ${item.label} (${item.file}) [qua ${item.depends_via}: ${item.relation}]\n`;
+        });
+      });
+
+      this.graphQueryResult.textContent = out;
+    } catch (err) {
+      this.graphQueryResult.textContent = `Lỗi phân tích tác động: ${err}`;
+    }
   }
 
   escapeHTML(str) {
