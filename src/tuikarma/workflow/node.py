@@ -8,7 +8,14 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Callable, Awaitable, Union, List
 
 from tuikarma.core.agent import Agent
-from tuikarma.core.events import MetricsEvent
+from tuikarma.core.event_bus import EventBus
+from tuikarma.core.events import (
+    MetricsEvent,
+    HITLApprovalRequestEvent,
+    HITLApprovalResponseEvent,
+    HITLCommandEvent,
+    HITLAction,
+)
 from tuikarma.tools.base import BaseTool
 from tuikarma.workflow.state import WorkflowState, NodeResult
 
@@ -306,4 +313,129 @@ class ParallelWorkflowNode(BaseWorkflowNode):
                 await branch.rollback(state)
             if self.node_id in state.node_outputs:
                 del state.node_outputs[self.node_id]
+
+
+class HITLWorkflowNode(BaseWorkflowNode):
+    """Workflow node that pauses execution until a human operator provides approval or guidance."""
+
+    def __init__(
+        self,
+        node_id: str,
+        name: str,
+        prompt: str,
+        bus: Optional[EventBus] = None,
+        timeout_seconds: Optional[float] = None,
+        auto_approve_in_headless: bool = True,
+        max_retries: int = 1,
+        retry_delay_seconds: float = 0.0,
+        rollback_handler: Optional[Callable[[WorkflowState], Union[None, Awaitable[None]]]] = None,
+    ) -> None:
+        super().__init__(
+            node_id=node_id,
+            name=name,
+            node_type="hitl",
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
+            rollback_handler=rollback_handler,
+        )
+        self.prompt = prompt
+        self.bus = bus
+        self.timeout_seconds = timeout_seconds
+        self.auto_approve_in_headless = auto_approve_in_headless
+        self._pending_future: Optional[asyncio.Future] = None
+
+    def _format_prompt(self, state: WorkflowState) -> str:
+        prompt_str = self.prompt
+        for k, v in state.node_outputs.items():
+            prompt_str = prompt_str.replace(f"{{{k}}}", str(v))
+        for k, v in state.shared_data.items():
+            prompt_str = prompt_str.replace(f"{{{k}}}", str(v))
+        prompt_str = prompt_str.replace("{task_description}", state.task_description)
+        return prompt_str
+
+    async def execute(self, state: WorkflowState) -> NodeResult:
+        formatted_prompt = self._format_prompt(state)
+
+        # Quick auto-approval in automated headless execution mode
+        if state.get_shared("headless_mode", False) and self.auto_approve_in_headless:
+            out_msg = "Tự động phê duyệt theo chính sách Headless CI/CD"
+            state.set_output(self.node_id, out_msg)
+            return NodeResult(node_id=self.node_id, success=True, output=out_msg)
+
+        state.set_shared("pending_hitl_node", self.node_id)
+        state.set_shared("pending_hitl_prompt", formatted_prompt)
+
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future = loop.create_future()
+        self._pending_future = future
+
+        async def on_approval_response(event: HITLApprovalResponseEvent) -> None:
+            if event.node_id == self.node_id and not future.done():
+                future.set_result((event.approved, event.guidance))
+
+        async def on_hitl_command(event: HITLCommandEvent) -> None:
+            if future.done():
+                return
+            if event.action == HITLAction.APPROVE:
+                future.set_result((True, event.payload or "Approved by operator"))
+            elif event.action == HITLAction.REJECT:
+                future.set_result((False, event.payload or "Rejected by operator"))
+            elif event.action == HITLAction.INJECT and event.payload:
+                state.set_shared("hitl_guidance", event.payload)
+
+        cleanup_handlers = []
+        if self.bus:
+            self.bus.subscribe(HITLApprovalResponseEvent, on_approval_response)
+            self.bus.subscribe(HITLCommandEvent, on_hitl_command)
+            cleanup_handlers.append((HITLApprovalResponseEvent, on_approval_response))
+            cleanup_handlers.append((HITLCommandEvent, on_hitl_command))
+
+            await self.bus.publish(
+                HITLApprovalRequestEvent(
+                    node_id=self.node_id,
+                    prompt=formatted_prompt,
+                    context={"outputs": state.node_outputs},
+                    timeout_seconds=self.timeout_seconds,
+                )
+            )
+
+        try:
+            if self.timeout_seconds and self.timeout_seconds > 0:
+                approved, guidance = await asyncio.wait_for(future, timeout=self.timeout_seconds)
+            elif not self.bus and self.auto_approve_in_headless:
+                approved, guidance = True, "Auto-approved in headless mode (no bus)"
+            else:
+                approved, guidance = await future
+        except asyncio.TimeoutError:
+            if self.auto_approve_in_headless:
+                approved, guidance = True, f"Auto-approved after {self.timeout_seconds}s timeout"
+            else:
+                approved, guidance = False, f"Timed out after {self.timeout_seconds}s waiting for operator"
+        except asyncio.CancelledError:
+            approved, guidance = False, "Approval cancelled"
+        finally:
+            if self.bus:
+                for evt_type, handler in cleanup_handlers:
+                    self.bus.unsubscribe(evt_type, handler)
+            if state.get_shared("pending_hitl_node") == self.node_id:
+                state.shared_data.pop("pending_hitl_node", None)
+
+        if approved:
+            out_msg = guidance or "Approved by human operator"
+            state.set_output(self.node_id, out_msg)
+            return NodeResult(node_id=self.node_id, success=True, output=out_msg)
+        else:
+            err_msg = guidance or "Rejected by human operator"
+            return NodeResult(
+                node_id=self.node_id,
+                success=False,
+                output=err_msg,
+                error_message=err_msg
+            )
+
+    async def rollback(self, state: WorkflowState) -> None:
+        if self._pending_future and not self._pending_future.done():
+            self._pending_future.cancel()
+        state.shared_data.pop("pending_hitl_node", None)
+        await super().rollback(state)
 

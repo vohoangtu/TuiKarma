@@ -95,6 +95,19 @@ class ToolApprovalResponseEvent(BaseEvent):
     reason: Optional[str] = None
 
 
+class HITLApprovalRequestEvent(BaseEvent):
+    node_id: str
+    prompt: str
+    context: Dict[str, Any] = Field(default_factory=dict)
+    timeout_seconds: Optional[float] = None
+
+
+class HITLApprovalResponseEvent(BaseEvent):
+    node_id: str
+    approved: bool
+    guidance: Optional[str] = None
+
+
 class EvaluationResultEvent(BaseEvent):
     task_id: str
     score: float  # 0.0 - 1.0 (hoặc 0 - 100%)

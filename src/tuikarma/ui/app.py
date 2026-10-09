@@ -30,6 +30,10 @@ from tuikarma.core.events import (
     WorkflowRollbackStartedEvent,
     WorkflowNodeRollbackEvent,
     WorkflowRollbackCompletedEvent,
+    HITLApprovalRequestEvent,
+    HITLApprovalResponseEvent,
+    HITLCommandEvent,
+    HITLAction,
     AgentState,
 )
 from tuikarma.core.event_bus import EventBus
@@ -179,6 +183,7 @@ class TUIKarmaApp(App):
         self._task_coro: Optional[asyncio.Task] = None
         self.recorder: Optional[TrajectoryRecorder] = None
         self.pending_approval = False
+        self.pending_hitl_node: Optional[str] = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -213,6 +218,7 @@ class TUIKarmaApp(App):
         self.bus.subscribe(ToolResultEvent, self.handle_tool_result)
         self.bus.subscribe(MetricsEvent, self.handle_metrics_event)
         self.bus.subscribe(ToolApprovalRequestEvent, self.handle_approval_request)
+        self.bus.subscribe(HITLApprovalRequestEvent, self.handle_hitl_approval_request)
         self.bus.subscribe(EvaluationResultEvent, self.handle_eval_event)
         self.bus.subscribe(WorkflowStartedEvent, self.handle_workflow_started)
         self.bus.subscribe(WorkflowNodeStartedEvent, self.handle_workflow_node_started)
@@ -321,6 +327,20 @@ class TUIKarmaApp(App):
             f"yêu cầu thực thi lệnh nguy hiểm [bold yellow]{event.tool_name}[/bold yellow]!\n"
             f"   [yellow]→ Nhấn [bold white][A][/bold white] để Duyệt hoặc gõ '/deny' vào ô lệnh.[/yellow]\n"
         )
+
+    def handle_hitl_approval_request(self, event: HITLApprovalRequestEvent) -> None:
+        self.pending_hitl_node = event.node_id
+        stream_log = self.query_one("#stream-log", RichLog)
+        inspector = self.query_one("#inspector-log", RichLog)
+        msg = (
+            f"\n[bold bright_yellow]✋ [HITL APPROVAL GATE][/bold bright_yellow] Nút [bold white]'{event.node_id}'[/bold white] "
+            f"đang chờ phê duyệt từ người vận hành!\n"
+            f"   [yellow]Yêu cầu: {event.prompt}[/yellow]\n"
+            f"   [dim yellow]→ Nhấn [bold white][A][/bold white] hoặc gõ [bold white]/approve[/bold white] để Duyệt; gõ [bold white]/reject[/bold white] để Từ chối; gõ [bold white]/inject <chỉ dẫn>[/bold white] để chỉ dẫn.[/dim yellow]\n"
+        )
+        stream_log.write(msg)
+        inspector.write(msg)
+
 
     def handle_metrics_event(self, event: MetricsEvent) -> None:
         metrics_panel = self.query_one("#metrics-panel", MetricsWidget)
@@ -435,6 +455,8 @@ class TUIKarmaApp(App):
             self.action_inject_guidance(guidance)
         elif cmd_lower in ["/approve", "a"]:
             self.action_approve_tool()
+        elif cmd_lower in ["/reject", "/deny", "d"]:
+            self.action_reject_hitl()
         elif cmd_lower in ["/restart", "r"]:
             self.action_restart_task()
         elif cmd_lower in ["/quit", "q"]:
@@ -490,12 +512,47 @@ class TUIKarmaApp(App):
         stream_log.write("[bold yellow]⚡ [HITL STEP][/bold yellow] Stepping forward 1 iteration...\n")
 
     def action_approve_tool(self) -> None:
+        asyncio.create_task(self.bus.publish(HITLCommandEvent(action=HITLAction.APPROVE)))
         inspector = self.query_one("#inspector-log", RichLog)
-        if self.pending_approval:
+        stream_log = self.query_one("#stream-log", RichLog)
+        if getattr(self, "pending_hitl_node", None):
+            node_id = self.pending_hitl_node
+            self.pending_hitl_node = None
+            asyncio.create_task(
+                self.bus.publish(
+                    HITLApprovalResponseEvent(
+                        node_id=node_id,
+                        approved=True,
+                        guidance="Chấp thuận bởi người vận hành (UI)"
+                    )
+                )
+            )
+            stream_log.write(f"\n[bold green]✔ [APPROVED BY OPERATOR][/bold green] Đã chấp thuận bước [bold white]'{node_id}'[/bold white].\n")
+        elif self.pending_approval:
             self.pending_approval = False
             inspector.write("[bold green]✔ [APPROVED BY HUMAN][/bold green] Lệnh nguy hiểm đã được cấp phép thực thi.\n")
         else:
-            inspector.write("[dim]Không có công cụ nào đang chờ phê duyệt.[/dim]\n")
+            inspector.write("[dim]Đã gửi tín hiệu Approve.[/dim]\n")
+
+    def action_reject_hitl(self) -> None:
+        asyncio.create_task(self.bus.publish(HITLCommandEvent(action=HITLAction.REJECT)))
+        stream_log = self.query_one("#stream-log", RichLog)
+        if getattr(self, "pending_hitl_node", None):
+            node_id = self.pending_hitl_node
+            self.pending_hitl_node = None
+            asyncio.create_task(
+                self.bus.publish(
+                    HITLApprovalResponseEvent(
+                        node_id=node_id,
+                        approved=False,
+                        guidance="Bị từ chối bởi người vận hành (UI)"
+                    )
+                )
+            )
+            stream_log.write(f"\n[bold red]✖ [REJECTED BY OPERATOR][/bold red] Đã từ chối bước [bold white]'{node_id}'[/bold white].\n")
+        else:
+            stream_log.write("[dim]Không có bước HITL nào đang chờ duyệt để từ chối.[/dim]\n")
+
 
     def action_restart_task(self) -> None:
         if self._task_coro and not self._task_coro.done():

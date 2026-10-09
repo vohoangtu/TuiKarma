@@ -126,10 +126,12 @@ class WorkflowDAGWidget(Static):
             elif st == "RUNNING":
                 if ntype == "parallel":
                     badge = f"[bold bright_cyan on #1e3a5f] ⫽ {nid} (PARALLEL) [/bold bright_cyan on #1e3a5f]"
+                elif ntype == "hitl":
+                    badge = f"[bold bright_yellow on #78350f] ✋ {nid} (CHỜ DUYỆT) [/bold bright_yellow on #78350f]"
                 else:
                     badge = f"[bold bright_yellow on #1f2937] ▶ {nid} [/bold bright_yellow on #1f2937]"
             elif st == "SUCCESS":
-                suffix = " (⫽)" if ntype == "parallel" else ""
+                suffix = " (⫽)" if ntype == "parallel" else " (✋)" if ntype == "hitl" else ""
                 badge = f"[bold green]✔ {nid}{suffix}[/bold green]"
             elif st == "SKIPPED":
                 badge = f"[bold yellow]⤼ {nid} (skip)[/bold yellow]"

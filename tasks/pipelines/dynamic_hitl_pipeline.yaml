@@ -1,0 +1,71 @@
+# Declarative Pipeline showcasing Dynamic Conditional Routing and Human-in-the-Loop (HITL) Approval Gate
+name: "Dynamic Routing & HITL Approval Pipeline"
+max_steps: 12
+default_retry_policy:
+  max_retries: 3
+  delay_seconds: 5.0
+
+nodes:
+  - id: "plan"
+    name: "Lập kế hoạch kiến trúc"
+    type: "agent"
+    agent: "Supervisor"
+    prompt: "Mục tiêu: {task_description}. Hãy lập phương án triển khai và tiêu chuẩn chấp thuận."
+    is_start: true
+
+  - id: "code"
+    name: "Phát triển giải pháp"
+    type: "agent"
+    agent: "Coder"
+    prompt: "Kế hoạch: {plan}. Hãy viết mã nguồn đầy đủ, type annotations và lưu file."
+
+  - id: "test"
+    name: "Kiểm thử tự động"
+    type: "agent"
+    agent: "Tester"
+    prompt: "Kiểm tra mã nguồn từ Coder ({code}). Hãy đánh giá tính đúng đắn và trả về PASSED nếu hoàn hảo."
+
+  - id: "eval_gate"
+    name: "Cổng rẽ nhánh điều kiện động"
+    type: "decision"
+    rules:
+      - condition: "contains(outputs.get('test', ''), 'FAIL') and iterations.get('code', 0) < 2"
+        to: "code"
+      - condition: "contains(outputs.get('test', ''), 'PASS') or True"
+        to: "security_gate"
+
+  - id: "security_gate"
+    name: "Cổng phê duyệt bảo mật (Human-in-the-Loop)"
+    type: "hitl"
+    prompt: "Kết quả kiểm thử ({test}). Xác nhận phê duyệt để đưa bản dựng vào triển khai."
+    timeout_seconds: 30.0
+    auto_approve_in_headless: true
+
+  - id: "deploy"
+    name: "Triển khai & Nghiệm thu sản phẩm"
+    type: "agent"
+    agent: "Supervisor"
+    prompt: "Đã qua phê duyệt ({security_gate}). Hãy nghiệm thu hoàn tất hệ thống."
+    is_end: true
+
+edges:
+  - from: "plan"
+    to: "code"
+    name: "Plan -> Code"
+  - from: "code"
+    to: "test"
+    name: "Code -> Test"
+  - from: "test"
+    to: "eval_gate"
+    name: "Test -> Decision Gate"
+  - from: "eval_gate"
+    to: "code"
+    name: "Gate Loop Back -> Code"
+    condition: "contains(outputs.get('test', ''), 'FAIL') and iterations.get('code', 0) < 2"
+  - from: "eval_gate"
+    to: "security_gate"
+    name: "Gate Forward -> Security HITL Gate"
+    condition: "contains(outputs.get('test', ''), 'PASS') or iterations.get('code', 0) >= 2"
+  - from: "security_gate"
+    to: "deploy"
+    name: "HITL Approved -> Deploy"

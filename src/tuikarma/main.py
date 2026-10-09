@@ -39,6 +39,7 @@ def run_headless_eval(task_spec: TaskSpec, llm: BaseLLMProvider, workflow_file: 
             engine = WorkflowParser.load_from_yaml(workflow_file, topology)
             topology.active_workflow = engine
             initial_state = WorkflowState(task_description=task_spec.description, max_steps=engine.max_steps)
+            initial_state.set_shared("headless_mode", True)
             await engine.execute(initial_state)
         else:
             await topology.execute_task_loop(task_spec.description)

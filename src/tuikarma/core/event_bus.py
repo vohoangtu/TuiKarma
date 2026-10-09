@@ -28,6 +28,13 @@ class EventBus:
             self._subscribers[event_type] = []
         self._subscribers[event_type].append(handler)
 
+    def unsubscribe(self, event_type: Type[T], handler: Callable[[T], Any]) -> None:
+        """Unregister a subscriber callback for an event type."""
+        if event_type in self._subscribers:
+            if handler in self._subscribers[event_type]:
+                self._subscribers[event_type].remove(handler)
+
+
     async def publish(self, event: BaseEvent) -> None:
         """Publish an event to all registered subscribers."""
         async with self._lock:

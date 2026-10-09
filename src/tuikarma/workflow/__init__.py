@@ -7,8 +7,10 @@ from tuikarma.workflow.node import (
     DecisionWorkflowNode,
     ToolWorkflowNode,
     ParallelWorkflowNode,
+    HITLWorkflowNode,
 )
 from tuikarma.workflow.edge import WorkflowEdge
+from tuikarma.workflow.expression import safe_evaluate_condition
 from tuikarma.workflow.engine import WorkflowEngine
 from tuikarma.workflow.builder import build_self_healing_coding_workflow
 from tuikarma.workflow.parser import WorkflowParser
@@ -21,8 +23,10 @@ __all__ = [
     "DecisionWorkflowNode",
     "ToolWorkflowNode",
     "ParallelWorkflowNode",
+    "HITLWorkflowNode",
     "WorkflowEdge",
     "WorkflowEngine",
+    "safe_evaluate_condition",
     "build_self_healing_coding_workflow",
     "WorkflowParser",
 ]

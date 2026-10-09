@@ -12,8 +12,10 @@ from tuikarma.workflow.node import (
     DecisionWorkflowNode,
     ToolWorkflowNode,
     ParallelWorkflowNode,
+    HITLWorkflowNode,
 )
 from tuikarma.workflow.edge import WorkflowEdge
+from tuikarma.workflow.expression import safe_evaluate_condition
 from tuikarma.workflow.state import WorkflowState
 
 if TYPE_CHECKING:
@@ -76,24 +78,17 @@ class WorkflowParser:
 
             def _build_decision_fn(rules_list: List[Dict[str, str]]) -> Callable[[WorkflowState], str]:
                 def _evaluate(state: WorkflowState) -> str:
-                    eval_context = {
-                        "state": state,
-                        "iterations": state.iterations,
-                        "task": state.task_description,
-                        **state.node_outputs,
-                        **state.shared_data,
-                    }
                     for rule in rules_list:
                         cond = rule.get("condition", "").strip()
-                        target = rule.get("target")
-                        if cond in ("default", "True", "true", "*", ""):
+                        target = rule.get("target") or rule.get("to") or rule.get("next")
+                        if not target:
+                            continue
+                        if safe_evaluate_condition(cond, state):
                             return target
-                        try:
-                            if eval(cond, {}, eval_context):
-                                return target
-                        except Exception:
-                            pass
-                    return rules_list[0].get("target") if rules_list else ""
+                    if rules_list:
+                        first = rules_list[0]
+                        return first.get("target") or first.get("to") or first.get("next") or ""
+                    return ""
 
                 return _evaluate
 
@@ -101,6 +96,21 @@ class WorkflowParser:
                 node_id=node_id,
                 name=node_name,
                 decision_fn=_build_decision_fn(rules),
+            )
+        elif node_type == "hitl":
+            prompt = n_conf.get("prompt", "Vui lòng xem xét và phê duyệt bước này.")
+            timeout_sec = n_conf.get("timeout_seconds")
+            timeout_val = float(timeout_sec) if timeout_sec is not None else None
+            auto_approve = bool(n_conf.get("auto_approve_in_headless", True))
+            return HITLWorkflowNode(
+                node_id=node_id,
+                name=node_name,
+                prompt=prompt,
+                bus=swarm.bus,
+                timeout_seconds=timeout_val,
+                auto_approve_in_headless=auto_approve,
+                max_retries=max_retries,
+                retry_delay_seconds=retry_delay,
             )
         elif node_type == "tool":
             tool_name = n_conf.get("tool", "")
@@ -168,12 +178,7 @@ class WorkflowParser:
             edge_name = e_conf.get("name", f"{from_node} -> {to_node}")
             cond_str = e_conf.get("condition")
 
-            cond_fn = None
-            if cond_str:
-                cond_fn = lambda st, c=cond_str: bool(
-                    eval(c, {}, {"state": st, "iterations": st.iterations, **st.node_outputs, **st.shared_data})
-                )
-
-            engine.add_edge(from_node=from_node, to_node=to_node, condition=cond_fn, name=edge_name)
+            engine.add_edge(from_node=from_node, to_node=to_node, condition=cond_str, name=edge_name)
 
         return engine
+
