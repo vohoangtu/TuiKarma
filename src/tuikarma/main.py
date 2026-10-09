@@ -61,6 +61,7 @@ def run_headless_eval(task_spec: TaskSpec, llm: BaseLLMProvider, workflow_file: 
 def main() -> None:
     parser = argparse.ArgumentParser(description="TUIKarma - Multi-Agent Harness & TUI Runner (2026)")
     parser.add_argument("--task", type=str, default="tasks/example_task.yaml", help="Path to task YAML specification")
+    parser.add_argument("--prompt", "-p", type=str, default=None, help="Giao việc nhanh trực tiếp bằng mô tả văn bản")
     parser.add_argument("--workflow", type=str, default=None, help="Path to declarative YAML workflow pipeline")
     parser.add_argument("--replay", type=str, default=None, help="Path to JSONL session trace file to replay")
     parser.add_argument("--backend", type=str, choices=["auto", "local", "scenario"], default="auto",
@@ -68,15 +69,22 @@ def main() -> None:
     parser.add_argument("--no-tui", action="store_true", help="Run in headless benchmark mode without TUI")
     args = parser.parse_args()
 
-    task_path = Path(args.task)
-    if task_path.exists():
-        task = TaskSpec.from_yaml(str(task_path))
-    else:
+    if args.prompt:
         task = TaskSpec(
-            id="DEFAULT-01",
-            title="Async Multi-Agent Co-Development",
-            description="Mô phỏng phối hợp phân tán giữa Supervisor, Coder, Tester và Critic.",
+            id="CUSTOM-TASK",
+            title="Ad-hoc Task Assignment",
+            description=args.prompt,
         )
+    else:
+        task_path = Path(args.task)
+        if task_path.exists():
+            task = TaskSpec.from_yaml(str(task_path))
+        else:
+            task = TaskSpec(
+                id="DEFAULT-01",
+                title="Async Multi-Agent Co-Development",
+                description="Mô phỏng phối hợp phân tán giữa Supervisor, Coder, Tester và Critic.",
+            )
 
     llm = get_default_llm_provider(force_backend=args.backend)
     replay_path = Path(args.replay) if args.replay else None

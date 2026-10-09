@@ -68,18 +68,50 @@ Hoặc ép dùng backend cụ thể:
 .\.venv\Scripts\python.exe main.py --backend scenario
 ```
 
-### 3. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
+### 3. Cách giao việc cho Swarm (3 phương thức linh hoạt)
+
+#### 🔹 Cách A: Giao việc nhanh trực tiếp bằng dòng lệnh (`--prompt` hoặc `-p`)
+Không cần tạo file, gõ trực tiếp yêu cầu từ Terminal:
 ```powershell
-# Chạy benchmark tự động với Live Antigravity Models hoặc YAML Pipeline
+.\.venv\Scripts\python.exe main.py --prompt "Viết module Async LRU Cache có TTL và test suite đầy đủ" --backend local
+```
+
+#### 🔹 Cách B: Giao việc bài bản bằng file cấu hình Task YAML (`--task`)
+Tạo một file định nghĩa công việc (ví dụ `tasks/my_task.yaml`):
+```yaml
+id: "TASK-2026-002"
+title: "Triển khai JWT Auth Middleware"
+description: "Xây dựng middleware kiểm thực JWT bảo mật, xử lý token hết hạn, refresh token và unit test."
+criteria:
+  - name: "Code Correctness"
+    weight: 0.5
+  - name: "Test Coverage"
+    weight: 0.3
+  - name: "Security & Review"
+    weight: 0.2
+```
+Khởi chạy kèm với workflow pipeline tự chọn:
+```powershell
+.\.venv\Scripts\python.exe main.py --task tasks/my_task.yaml --workflow tasks/pipelines/parallel_tdd_pipeline.yaml --backend local
+```
+
+#### 🔹 Cách C: Giao việc và can thiệp trực tiếp trong TUI (Interactive Command Bar)
+Khi giao diện TUI đang chạy:
+- **Giao việc mới hoặc yêu cầu sửa đổi**: Nhập trực tiếp vào ô input `⚡ HITL:` ở thanh đáy rồi nhấn `[Enter]` — tin nhắn sẽ được chuyển trực tiếp tới **Supervisor** để phân bổ lại cho Coder / Tester.
+- **Nạp gợi ý sửa lỗi**: Gõ `/inject <chỉ dẫn>` để Agent áp dụng ngay vào lần retry / lập trình tiếp theo.
+
+### 4. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
+```powershell
+# Chạy benchmark tự động không cần mở giao diện TUI
 .\.venv\Scripts\python.exe main.py --no-tui --workflow tasks/pipelines/dynamic_hitl_pipeline.yaml --backend scenario
 ```
 
-### 4. Phát lại phiên làm việc đã lưu (Replay Mode)
+### 5. Phát lại phiên làm việc đã lưu (Replay Mode)
 ```powershell
 .\.venv\Scripts\python.exe main.py --replay traces/session_20261009_125925.jsonl
 ```
 
-### 5. Chạy toàn bộ bộ kiểm thử tự động (30 Unit Tests & UI Pilot Tests)
+### 6. Chạy toàn bộ bộ kiểm thử tự động (30 Unit Tests & UI Pilot Tests)
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
