@@ -160,6 +160,10 @@ class WebSessionManager:
         elif isinstance(event, HITLApprovalResponseEvent):
             self.last_status["pending_approval"] = None
 
+        if self.active_project:
+            self.last_status["active_project"] = self.active_project.model_dump()
+            self.last_status["active_milestones"] = self.active_project.milestones
+
         await self.broadcast_event({"type": "EVENT", "event": payload})
 
     async def start_task(self, req: RunTaskRequest) -> Dict[str, Any]:
@@ -293,6 +297,7 @@ class WebSessionManager:
         self.active_task_coro = asyncio.create_task(_run())
         return {
             "status": "STARTED",
+            "project": project.model_dump(),
             "project_id": project.id,
             "project_name": project.name,
             "project_path": project.path,

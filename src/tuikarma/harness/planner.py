@@ -60,7 +60,14 @@ class AutonomousPlanner:
     ) -> ProjectPlan:
         cb_text = ""
         if codebase_summary and codebase_summary.get("total_files", 0) > 0:
-            cb_text = f"\nThông tin Codebase hiện có ({codebase_summary['total_files']} files):\n" + json.dumps(codebase_summary, indent=2, ensure_ascii=False)
+            compact_cb = {
+                "project_name": codebase_summary.get("project_name"),
+                "total_files": codebase_summary.get("total_files"),
+                "key_configs": codebase_summary.get("key_configs"),
+                "file_types": codebase_summary.get("file_types"),
+                "sample_files": (codebase_summary.get("files_sample") or [])[:25],
+            }
+            cb_text = f"\nThông tin Codebase ({compact_cb['total_files']} files):\n" + json.dumps(compact_cb, indent=2, ensure_ascii=False)
 
         prompt = f"""Bạn là Trưởng nhóm Kiến trúc sư Phần mềm (Chief Software Architect & Lead Product Manager).
 Mục tiêu cấp cao của người dùng:
@@ -85,10 +92,9 @@ Trả về định dạng JSON DUY NHẤT (không kèm markdown) theo cấu trú
 }}
 """
         response = await self.llm.generate(
-            prompt=prompt,
+            model_name="antigravity/claude-sonnet-4-6",
             system_prompt="You are a Chief Software Architect. Return valid JSON only.",
-            model="antigravity/claude-sonnet-4-6",
-            temperature=0.2,
+            messages=[{"role": "user", "content": prompt}],
         )
 
         raw = response.content.strip()

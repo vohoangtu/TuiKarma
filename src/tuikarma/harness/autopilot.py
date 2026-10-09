@@ -59,6 +59,13 @@ class AutoPilotRunner:
         logger.info(f"Starting AutoPilot for project '{self.project.name}' at {proj_dir}")
 
         # Step 1: Scan codebase if opening existing folder
+        await self.bus.publish(
+            MessageEvent(
+                sender="AutoPilot [Engine]",
+                receiver="User",
+                content=f"🔍 Bắt đầu khảo sát cấu trúc codebase '{self.project.name}' ({proj_dir})..."
+            )
+        )
         codebase_summary = self.project_manager.scan_project_codebase(self.project.path)
 
         # Step 2: Retrieve relevant cumulative lessons learned
@@ -104,6 +111,10 @@ class AutoPilotRunner:
 
             self.current_milestone = m
             m.status = "IN_PROGRESS"
+            for idx, item in enumerate(self.project.milestones):
+                if item["id"] == m.id:
+                    self.project.milestones[idx]["status"] = "IN_PROGRESS"
+            self.project_manager._save_registry()
 
             await self.bus.publish(
                 MessageEvent(

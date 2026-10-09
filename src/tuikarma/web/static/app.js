@@ -333,7 +333,7 @@ class TUIKarmaWebClient {
   }
 
   handleServerMessage(msg) {
-    if (msg.type === "INITIAL_STATE") {
+    if (msg.type === "INITIAL_STATE" || msg.type === "STATUS_UPDATE") {
       this.updateStatus(msg.data);
     } else if (msg.type === "EVENT") {
       this.processBusEvent(msg.event);
@@ -373,6 +373,11 @@ class TUIKarmaWebClient {
       this.statusVal.textContent = "RUNNING";
       this.activePipelineName.textContent = evt.workflow_name;
       this.activeStepInfo.textContent = `Bắt đầu DAG với ${evt.total_nodes} nodes...`;
+      // Ensure DAG canvas nodes are rendered
+      const pipe = this.pipelines.find(p => p.name === evt.workflow_name || (evt.workflow_name && p.path.includes("parallel_tdd")));
+      if (pipe) {
+        this.renderPipelinePreview(pipe.path);
+      }
       this.resetDAGNodesState();
     } else if (type === "WorkflowNodeStartedEvent") {
       this.setNodeActive(evt.node_id, "RUNNING");
@@ -664,6 +669,35 @@ class TUIKarmaWebClient {
     this.statusVal.textContent = "PLANNING";
     this.appendTerminalLine("cmd", `[GIAO VIỆC] Mở dự án tại '${folderPath}', nhận mục tiêu: ${goal}`);
 
+    // Show milestone ribbon immediately with progress indicator
+    if (this.milestoneRibbon) {
+      this.milestoneRibbon.style.display = "block";
+      const pName = folderPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Dự án";
+      this.activeProjectTitle.textContent = `Dự án: ${pName}`;
+      this.activeProjectPathBadge.textContent = folderPath;
+      this.milestoneProgressBadge.textContent = "Đang khởi tạo...";
+      this.milestonesSteps.innerHTML = `
+        <div class="milestone-card IN_PROGRESS" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="milestone-id-badge">PLANNING</span>
+            <span style="font-size: 0.72rem; font-weight: 600;">⌛ Đang phân tích</span>
+          </div>
+          <div class="milestone-title">Khảo sát Codebase & Lập kế hoạch Cột mốc</div>
+          <div class="milestone-goal">AI Planner đang khảo sát toàn bộ codebase và phân rã mục tiêu: "${this.escapeHTML(goal)}"</div>
+        </div>
+      `;
+    }
+
+    // Auto-switch to Live Dialogue & CoT tab so user sees real-time progress
+    const tabDialogueBtn = document.querySelector('.tab-btn[data-tab="tab-dialogue"]');
+    if (tabDialogueBtn) tabDialogueBtn.click();
+
+    // Auto-render default pipeline preview on DAG Canvas
+    if (this.pipelines && this.pipelines.length > 0) {
+      const p = this.pipelines.find(item => item.path.includes("parallel_tdd")) || this.pipelines[0];
+      if (p) this.renderPipelinePreview(p.path);
+    }
+
     try {
       const res = await fetch("/api/autopilot/start", {
         method: "POST",
@@ -682,6 +716,9 @@ class TUIKarmaWebClient {
       }
       const data = await res.json();
       this.appendTerminalLine("res", `[GIAO VIỆC] Đã nhận nhiệm vụ và bắt đầu thực thi trên codebase: ${data.project_path}`);
+      if (data.project) {
+        this.renderMilestonesRibbon(data.project);
+      }
       this.fetchProjects();
     } catch (err) {
       alert(`Lỗi kết nối máy chủ: ${err}`);
