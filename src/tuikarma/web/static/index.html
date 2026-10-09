@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TUIKarma Web Dashboard | Light Fluent 2 Mica UI</title>
+  <meta name="description" content="Visual Orchestration & Evaluation Dashboard for Multi-Agent Workflows in Microsoft Fluent 2 Mica UI">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <!-- Top Mica Navigation & Telemetry Header -->
+  <header class="app-header" id="app-header">
+    <div class="brand-section">
+      <div class="brand-logo" id="brand-logo">⚡</div>
+      <h1 class="brand-title">
+        TUIKarma
+        <span class="brand-badge">Fluent 2 Mica UI</span>
+      </h1>
+    </div>
+
+    <!-- Live Telemetry Counters -->
+    <div class="telemetry-bar" id="telemetry-bar">
+      <div class="telemetry-pill">
+        <span class="live-indicator" id="ws-status-indicator"></span>
+        <span class="label">Trạng thái:</span>
+        <span class="value" id="status-val">IDLE</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="label">Tokens In/Out:</span>
+        <span class="value" id="tokens-val">0 / 0</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="label">Chi phí:</span>
+        <span class="value" id="cost-val">$0.0000</span>
+      </div>
+      <div class="telemetry-pill" id="score-pill" style="display: none;">
+        <span class="label">Score:</span>
+        <span class="value" id="score-val">--</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container" id="main-container">
+    
+    <!-- Left Sidebar: Task Assignment & Pipeline Launcher -->
+    <aside class="sidebar" id="sidebar">
+      <div class="mica-surface" style="padding: 18px;">
+        <div class="panel-header">
+          <h2><span>🚀</span> Giao việc cho Swarm</h2>
+        </div>
+
+        <form id="launch-form" style="display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
+          <div class="form-group">
+            <label for="task-prompt">Yêu cầu công việc (Prompt):</label>
+            <textarea id="task-prompt" class="fluent-textarea" placeholder="Nhập yêu cầu (ví dụ: Xây dựng Async Token Bucket Rate Limiter có unit test)..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="pipeline-select">Quy trình (Workflow Pipeline):</label>
+            <select id="pipeline-select" class="fluent-select">
+              <option value="tasks/pipelines/dynamic_hitl_pipeline.yaml">Dynamic Routing & HITL Approval</option>
+              <option value="tasks/pipelines/parallel_tdd_pipeline.yaml">Parallel Fork-Join TDD (Song song)</option>
+              <option value="tasks/pipelines/self_healing_coding.yaml">Self-Healing Coding (Tự sửa lỗi)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="backend-select">LLM Backend Gateway:</label>
+            <select id="backend-select" class="fluent-select">
+              <option value="local">Antigravity Gateway (http://localhost:20128/v1)</option>
+              <option value="scenario">Deterministic Scenario (Offline Mock)</option>
+              <option value="auto" selected>Auto Detect (Tự nhận diện)</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-primary" id="btn-launch-task">
+            <span>▶</span> Khởi chạy Swarm
+          </button>
+        </form>
+      </div>
+
+      <!-- Quick Preset Tasks -->
+      <div class="mica-surface" style="padding: 16px;">
+        <div class="panel-header">
+          <h2><span>💡</span> Kịch bản mẫu có sẵn</h2>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <button type="button" class="btn-fluent preset-btn" data-prompt="Triển khai thuật toán Async Token Bucket Rate Limiter trong Python 3.14+, kèm unit test và phân tích concurrency.">
+            Rate Limiter (Concurrency)
+          </button>
+          <button type="button" class="btn-fluent preset-btn" data-prompt="Xây dựng Async LRU Cache với cơ chế TTL hết hạn và xử lý luồng an toàn.">
+            Async LRU Cache (Memory)
+          </button>
+          <button type="button" class="btn-fluent preset-btn" data-prompt="Thiết kế JWT Auth Middleware với kiểm tra chữ ký và blacklist token thu hồi.">
+            JWT Auth Middleware (Security)
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Workspace Area -->
+    <section class="content-area" id="content-area">
+      
+      <!-- Visual Workflow Pipeline DAG Canvas -->
+      <div class="mica-surface dag-canvas-container" id="dag-container">
+        <div class="dag-header">
+          <div class="dag-title-wrap">
+            <span style="font-size: 1.2rem;">⚡</span>
+            <div>
+              <h2 style="font-size: 0.95rem; font-weight: 600;" id="active-pipeline-name">Workflow Pipeline DAG</h2>
+              <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="active-step-info">Đang chờ khởi chạy...</span>
+            </div>
+          </div>
+          <div id="dag-legend" style="display: flex; gap: 8px; font-size: 0.72rem; color: var(--text-secondary);">
+            <span>○ Chờ</span> • <span style="color: var(--accent-primary);">▶ Đang chạy</span> • <span style="color: var(--status-success);">✔ Thành công</span> • <span style="color: #d83b01;">✋ HITL</span>
+          </div>
+        </div>
+
+        <div class="dag-flow" id="dag-flow">
+          <!-- Dynamically injected DAG nodes -->
+          <div class="dag-node" id="node-preview-placeholder">
+            <div class="node-header"><span class="node-type-badge">INFO</span></div>
+            <div class="node-title">Sẵn sàng</div>
+            <div class="node-agent">Chọn pipeline & bấm Khởi chạy</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Swarm Matrix Cards -->
+      <div class="agents-grid" id="agents-grid">
+        <!-- Supervisor Card -->
+        <div class="mica-surface agent-card" id="card-supervisor">
+          <div class="agent-card-header">
+            <div class="agent-avatar" style="color: #0078d4;">👑</div>
+            <div class="agent-info">
+              <h3>Supervisor</h3>
+              <div class="agent-model">claude-sonnet-4-6</div>
+            </div>
+          </div>
+          <span class="agent-status-chip IDLE" id="chip-supervisor">IDLE</span>
+          <div class="agent-reasoning-preview" id="cot-supervisor">Chờ phân công nhiệm vụ...</div>
+        </div>
+
+        <!-- Coder Card -->
+        <div class="mica-surface agent-card" id="card-coder">
+          <div class="agent-card-header">
+            <div class="agent-avatar" style="color: #107c41;">💻</div>
+            <div class="agent-info">
+              <h3>Coder</h3>
+              <div class="agent-model">claude-sonnet-4-6</div>
+            </div>
+          </div>
+          <span class="agent-status-chip IDLE" id="chip-coder">IDLE</span>
+          <div class="agent-reasoning-preview" id="cot-coder">Sẵn sàng viết code và sandbox files...</div>
+        </div>
+
+        <!-- Tester Card -->
+        <div class="mica-surface agent-card" id="card-tester">
+          <div class="agent-card-header">
+            <div class="agent-avatar" style="color: #008272;">🧪</div>
+            <div class="agent-info">
+              <h3>Tester</h3>
+              <div class="agent-model">gemini-3.1-flash-lite</div>
+            </div>
+          </div>
+          <span class="agent-status-chip IDLE" id="chip-tester">IDLE</span>
+          <div class="agent-reasoning-preview" id="cot-tester">Sẵn sàng soạn test suite TDD...</div>
+        </div>
+
+        <!-- Critic Card -->
+        <div class="mica-surface agent-card" id="card-critic">
+          <div class="agent-card-header">
+            <div class="agent-avatar" style="color: #5c2d91;">🔍</div>
+            <div class="agent-info">
+              <h3>Critic</h3>
+              <div class="agent-model">opus-4-6-thinking</div>
+            </div>
+          </div>
+          <span class="agent-status-chip IDLE" id="chip-critic">IDLE</span>
+          <div class="agent-reasoning-preview" id="cot-critic">Sẵn sàng phản biện & kiểm tra bảo mật...</div>
+        </div>
+      </div>
+
+      <!-- HITL Interactive Command Ribbon (Mica Bar) -->
+      <div class="mica-surface hitl-ribbon" id="hitl-ribbon">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.1rem;">⚡</span>
+          <span style="font-weight: 600; font-size: 0.85rem;" id="hitl-ribbon-status">Điều khiển HITL:</span>
+        </div>
+
+        <div class="hitl-actions-group" id="hitl-actions">
+          <button type="button" class="btn-fluent" id="btn-pause" title="Tạm dừng hoặc tiếp tục">⏸ Tạm dừng</button>
+          <button type="button" class="btn-fluent" id="btn-step" title="Chạy bước tiếp theo">⏭ Bước tiếp</button>
+          <button type="button" class="btn-fluent btn-approve" id="btn-approve" title="Phê duyệt cổng HITL hoặc công cụ">✋ Approve (A)</button>
+          <button type="button" class="btn-fluent btn-reject" id="btn-reject" title="Từ chối phê duyệt">❌ Reject (D)</button>
+          <button type="button" class="btn-fluent" id="btn-retry-now" title="Retry ngay lập tức">⚡ Retry-Now</button>
+          <button type="button" class="btn-fluent" id="btn-skip" title="Bỏ qua nút lỗi">⤼ Skip</button>
+          <button type="button" class="btn-fluent" id="btn-rollback" title="Kích hoạt Saga Rollback">↩ Rollback</button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="text" class="fluent-input hitl-inject-input" id="hitl-inject-text" placeholder="Gõ gợi ý sửa lỗi...">
+          <button type="button" class="btn-fluent" id="btn-inject-send">Nạp chỉ dẫn</button>
+        </div>
+      </div>
+
+      <!-- Multi-tab Stream & Sandbox Explorer -->
+      <div class="mica-surface stream-panel" id="stream-panel">
+        <div class="tabs-header">
+          <button type="button" class="tab-btn active" data-tab="tab-dialogue">💬 Live Dialogue & CoT</button>
+          <button type="button" class="tab-btn" data-tab="tab-inspector">⚙️ Tool Inspector</button>
+          <button type="button" class="tab-btn" data-tab="tab-sandbox">📁 Sandbox Workspace Files</button>
+        </div>
+
+        <!-- Tab 1: Live Dialogue -->
+        <div class="tab-content active" id="tab-dialogue">
+          <div id="dialogue-list">
+            <div class="dialogue-item">
+              <div class="dialogue-avatar">⚡</div>
+              <div class="dialogue-bubble">
+                <div class="dialogue-sender">HỆ THỐNG</div>
+                <div>Chào mừng đến với TUIKarma Light Fluent 2 Mica Dashboard. Hãy chọn một kịch bản hoặc nhập yêu cầu để bắt đầu.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Tool Inspector -->
+        <div class="tab-content" id="tab-inspector">
+          <div class="terminal-window" id="terminal-log">
+            <div class="terminal-line res">[TUIKarma Tool Inspector sẵn sàng theo dõi các tác vụ sandbox]</div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Sandbox File Explorer -->
+        <div class="tab-content" id="tab-sandbox">
+          <div class="file-explorer">
+            <div class="file-list" id="sandbox-file-list">
+              <div style="font-size: 0.8rem; color: var(--text-tertiary); padding: 6px;">Đang tải tệp tin...</div>
+            </div>
+            <div class="code-viewer" id="sandbox-code-preview">
+              # Chọn một tệp tin bên trái để xem nội dung mã nguồn được sinh ra trong sandbox.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

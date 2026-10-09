@@ -68,7 +68,18 @@ Hoặc ép dùng backend cụ thể:
 .\.venv\Scripts\python.exe main.py --backend scenario
 ```
 
-### 3. Cách giao việc cho Swarm (3 phương thức linh hoạt)
+### 3. Khởi chạy Light Fluent 2 Mica Web UI Dashboard (Trình duyệt Web)
+Trực quan hóa và điều khiển đàn Agent trên giao diện web hiện đại phong cách **Microsoft Fluent Design System 2** (Mica translucent material, Acrylic glassmorphism):
+```powershell
+.\.venv\Scripts\python.exe main.py --web --port 8080
+```
+Mở trình duyệt tại: `http://localhost:8080`
+- **Visual DAG Canvas**: Xem trực quan luồng nodes, hiệu ứng pulse khi chạy, highlight cổng HITL và rollback.
+- **Agent Matrix Cards**: Theo dõi trạng thái CoT, model routing của từng Agent trong Swarm.
+- **HITL Command Ribbon**: Phê duyệt (`[A]`), Từ chối (`[D]`), Tạm dừng, Bước tiếp, Rollback hoặc nạp chỉ dẫn trực tiếp bằng chuột và phím tắt.
+- **Sandbox Code Viewer**: Duyệt cây tệp và xem mã nguồn được sinh ra trong sandbox theo thời gian thực.
+
+### 4. Cách giao việc cho Swarm (3 phương thức linh hoạt)
 
 #### 🔹 Cách A: Giao việc nhanh trực tiếp bằng dòng lệnh (`--prompt` hoặc `-p`)
 Không cần tạo file, gõ trực tiếp yêu cầu từ Terminal:
@@ -95,23 +106,22 @@ Khởi chạy kèm với workflow pipeline tự chọn:
 .\.venv\Scripts\python.exe main.py --task tasks/my_task.yaml --workflow tasks/pipelines/parallel_tdd_pipeline.yaml --backend local
 ```
 
-#### 🔹 Cách C: Giao việc và can thiệp trực tiếp trong TUI (Interactive Command Bar)
-Khi giao diện TUI đang chạy:
-- **Giao việc mới hoặc yêu cầu sửa đổi**: Nhập trực tiếp vào ô input `⚡ HITL:` ở thanh đáy rồi nhấn `[Enter]` — tin nhắn sẽ được chuyển trực tiếp tới **Supervisor** để phân bổ lại cho Coder / Tester.
-- **Nạp gợi ý sửa lỗi**: Gõ `/inject <chỉ dẫn>` để Agent áp dụng ngay vào lần retry / lập trình tiếp theo.
+#### 🔹 Cách C: Giao việc và can thiệp trực tiếp trong TUI / Web Dashboard
+- **Trên Web Dashboard**: Nhập prompt vào form bên trái, chọn pipeline và nhấn `▶ Khởi chạy Swarm`.
+- **Trên TUI**: Gõ vào ô input `⚡ HITL:` ở thanh đáy rồi nhấn `[Enter]`.
 
-### 4. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
+### 5. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
 ```powershell
 # Chạy benchmark tự động không cần mở giao diện TUI
 .\.venv\Scripts\python.exe main.py --no-tui --workflow tasks/pipelines/dynamic_hitl_pipeline.yaml --backend scenario
 ```
 
-### 5. Phát lại phiên làm việc đã lưu (Replay Mode)
+### 6. Phát lại phiên làm việc đã lưu (Replay Mode)
 ```powershell
 .\.venv\Scripts\python.exe main.py --replay traces/session_20261009_125925.jsonl
 ```
 
-### 6. Chạy toàn bộ bộ kiểm thử tự động (30 Unit Tests & UI Pilot Tests)
+### 7. Chạy toàn bộ bộ kiểm thử tự động (35 Unit Tests & Web Tests)
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
@@ -154,6 +164,7 @@ TUIKarma/
 │   ├── test_workflow.py        # Unit tests cho DAGs, cycles, retries và saga rollback
 │   ├── test_parallel_workflow.py # Unit tests cho Parallel Fork-Join DAG
 │   ├── test_dynamic_routing_and_hitl.py # Unit tests cho Dynamic Expression Routing & HITL
+│   ├── test_web_server.py      # Unit tests cho Light Fluent 2 Mica Web UI & REST/WS APIs
 │   ├── test_sandbox_snapshot.py# Unit tests cho Snapshot & phục hồi file trên đĩa
 │   ├── test_workflow_parser.py # Unit tests cho parser YAML pipeline
 │   └── test_hitl_controls.py   # Unit tests cho các lệnh can thiệp HITL
@@ -173,10 +184,16 @@ TUIKarma/
         │   ├── engine.py       # Core WorkflowEngine runner với Retry (3x30s) & Reverse Saga Rollback
         │   ├── parser.py       # Declarative YAML Workflow DSL Loader
         │   └── builder.py      # Pre-built self-healing coding workflows
+        ├── web/
+        │   ├── server.py       # FastAPI Web Dashboard server, WebSocket hub, REST endpoints
+        │   └── static/
+        │       ├── index.html  # Light Fluent 2 Mica semantic HTML5 layout
+        │       ├── styles.css  # Microsoft Fluent 2 Mica material, Acrylic glass & animations
+        │       └── app.js      # WebSocket realtime event client & DAG visualizer
         ├── tools/
         │   ├── base.py         # BaseTool & ToolRegistry
         │   ├── filesystem.py   # Sandboxed Read/Write/List file tools
-        │   ├── runner.py       # Isolated Python/CLI execution tools with security gate
+        │   ├── runner.py       # Isolated Python/CLI execution tools với security gate
         │   └── snapshot.py     # SandboxSnapshotManager quản lý checkpoint/restore file đĩa
         ├── harness/
         │   ├── task.py         # TaskSpec & Evaluation criteria

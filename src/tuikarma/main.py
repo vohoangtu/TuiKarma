@@ -67,7 +67,15 @@ def main() -> None:
     parser.add_argument("--backend", type=str, choices=["auto", "local", "scenario"], default="auto",
                         help="LLM backend: 'local' (http://localhost:20128/v1), 'scenario' (mock), or 'auto' (detect)")
     parser.add_argument("--no-tui", action="store_true", help="Run in headless benchmark mode without TUI")
+    parser.add_argument("--web", action="store_true", help="Khởi chạy Light Fluent 2 Mica Web UI Dashboard")
+    parser.add_argument("--port", type=int, default=8080, help="Cổng chạy Web UI (mặc định: 8080)")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host chạy Web UI (mặc định: 127.0.0.1)")
     args = parser.parse_args()
+
+    if args.web:
+        from tuikarma.web.server import run_web_server
+        run_web_server(host=args.host, port=args.port)
+        return
 
     if args.prompt:
         task = TaskSpec(
