@@ -3,7 +3,7 @@
 from __future__ import annotations
 from enum import Enum
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from pydantic import BaseModel, Field
 import uuid
 
@@ -101,3 +101,75 @@ class EvaluationResultEvent(BaseEvent):
     passed: bool
     criteria_scores: Dict[str, float] = Field(default_factory=dict)
     feedback: str = ""
+
+
+class WorkflowStatus(str, Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class WorkflowStartedEvent(BaseEvent):
+    workflow_name: str
+    total_nodes: int
+
+
+class WorkflowNodeStartedEvent(BaseEvent):
+    node_id: str
+    node_type: str
+    agent_name: Optional[str] = None
+    iteration: int = 1
+
+
+class WorkflowNodeCompletedEvent(BaseEvent):
+    node_id: str
+    status: str
+    output_summary: str
+    duration_ms: float = 0.0
+
+
+class WorkflowTransitionEvent(BaseEvent):
+    from_node: str
+    to_node: str
+    reason: Optional[str] = None
+
+
+class WorkflowCompletedEvent(BaseEvent):
+    workflow_name: str
+    total_steps: int
+    success: bool
+    duration_ms: float = 0.0
+
+
+class WorkflowNodeRetryEvent(BaseEvent):
+    node_id: str
+    attempt: int
+    max_retries: int
+    delay_seconds: float
+    error_reason: str
+
+
+class WorkflowFailedEvent(BaseEvent):
+    workflow_name: str
+    failed_node_id: str
+    error_message: str
+
+
+class WorkflowRollbackStartedEvent(BaseEvent):
+    workflow_name: str
+    failed_node_id: str
+    nodes_to_rollback: List[str] = Field(default_factory=list)
+
+
+class WorkflowNodeRollbackEvent(BaseEvent):
+    node_id: str
+    status: str  # "STARTING", "COMPLETED", "FAILED"
+    details: Optional[str] = None
+
+
+class WorkflowRollbackCompletedEvent(BaseEvent):
+    workflow_name: str
+    success: bool
+    rolled_back_nodes: List[str] = Field(default_factory=list)

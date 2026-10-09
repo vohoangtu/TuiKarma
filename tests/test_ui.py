@@ -27,6 +27,9 @@ async def test_app_mount_and_pilot_flow():
         # Test single step forward
         app.action_step_forward()
 
+        dag = app.query_one("#workflow-dag-widget")
+        assert dag is not None
+
         # Let the task finish
         await pilot.pause(3.5)
         metrics = app.query_one("#metrics-panel")

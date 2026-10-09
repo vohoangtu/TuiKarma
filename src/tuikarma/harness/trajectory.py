@@ -15,6 +15,16 @@ from tuikarma.core.events import (
     ToolResultEvent,
     MetricsEvent,
     EvaluationResultEvent,
+    WorkflowStartedEvent,
+    WorkflowNodeStartedEvent,
+    WorkflowNodeCompletedEvent,
+    WorkflowTransitionEvent,
+    WorkflowCompletedEvent,
+    WorkflowNodeRetryEvent,
+    WorkflowFailedEvent,
+    WorkflowRollbackStartedEvent,
+    WorkflowNodeRollbackEvent,
+    WorkflowRollbackCompletedEvent,
 )
 from tuikarma.core.event_bus import EventBus
 
@@ -25,6 +35,16 @@ EVENT_CLASS_MAP = {
     "ToolResultEvent": ToolResultEvent,
     "MetricsEvent": MetricsEvent,
     "EvaluationResultEvent": EvaluationResultEvent,
+    "WorkflowStartedEvent": WorkflowStartedEvent,
+    "WorkflowNodeStartedEvent": WorkflowNodeStartedEvent,
+    "WorkflowNodeCompletedEvent": WorkflowNodeCompletedEvent,
+    "WorkflowTransitionEvent": WorkflowTransitionEvent,
+    "WorkflowCompletedEvent": WorkflowCompletedEvent,
+    "WorkflowNodeRetryEvent": WorkflowNodeRetryEvent,
+    "WorkflowFailedEvent": WorkflowFailedEvent,
+    "WorkflowRollbackStartedEvent": WorkflowRollbackStartedEvent,
+    "WorkflowNodeRollbackEvent": WorkflowNodeRollbackEvent,
+    "WorkflowRollbackCompletedEvent": WorkflowRollbackCompletedEvent,
 }
 
 

@@ -1,0 +1,81 @@
+# Declarative Workflow Pipeline: Self-Healing Code-Test-Review (2026)
+name: "Self-Healing Code-Test-Review Pipeline"
+max_steps: 12
+default_retry_policy:
+  max_retries: 3
+  delay_seconds: 30.0
+
+nodes:
+  - id: "plan"
+    name: "Lập kế hoạch kiến trúc"
+    type: "agent"
+    agent: "Supervisor"
+    model: "antigravity/claude-sonnet-4-6"
+    prompt: "Mục tiêu: {task_description}. Hãy phân tích yêu cầu, thiết kế kiến trúc và phân công cho Coder, Tester, Critic."
+    is_start: true
+
+  - id: "code"
+    name: "Triển khai mã nguồn"
+    type: "agent"
+    agent: "Coder"
+    model: "antigravity/claude-sonnet-4-6"
+    prompt: "Kế hoạch của Supervisor: {plan}. Hãy viết mã nguồn đầy đủ, chuẩn type hints và dùng công cụ write_file lưu vào sandbox."
+    retry_policy:
+      max_retries: 3
+      delay_seconds: 30.0
+
+  - id: "test"
+    name: "Kiểm thử tự động"
+    type: "agent"
+    agent: "Tester"
+    model: "antigravity/gemini-3.1-flash-lite"
+    prompt: "Mã nguồn vừa được Coder tạo ra: {code}. Hãy thiết kế unit tests, dùng write_file và run_command để chạy pytest kiểm tra lỗi."
+    retry_policy:
+      max_retries: 3
+      delay_seconds: 30.0
+
+  - id: "evaluate_test"
+    name: "Đánh giá kết quả test"
+    type: "decision"
+    rules:
+      - condition: "any(kw in str(test).lower() for kw in ['failed', 'error', 'traceback', 'assertionerror']) and iterations.get('fix_code', 0) < 2"
+        target: "fix_code"
+      - condition: "default"
+        target: "review"
+
+  - id: "fix_code"
+    name: "Sửa lỗi theo feedback test"
+    type: "agent"
+    agent: "Coder"
+    prompt: "Phát hiện lỗi kiểm thử: {test}. Hãy phân tích nguyên nhân và dùng write_file để cập nhật bản vá sửa lỗi."
+
+  - id: "review"
+    name: "Đánh giá chất lượng & bảo mật"
+    type: "agent"
+    agent: "Critic"
+    model: "antigravity/claude-opus-4-6-thinking"
+    prompt: "Mã nguồn đã qua test: {code}. Đánh giá kiến trúc, PEP-8, rủi ro bảo mật và đưa ra kết luận chấp thuận (APPROVED) hoặc khuyến nghị."
+
+  - id: "synthesize"
+    name: "Tổng hợp & Nghiệm thu"
+    type: "agent"
+    agent: "Supervisor"
+    prompt: "Kết quả review: {review}. Hãy tổng kết toàn bộ quá trình, xác nhận các file đã hoàn thành và nghiệm thu nhiệm vụ."
+    is_end: true
+
+edges:
+  - from: "plan"
+    to: "code"
+    name: "Kế hoạch xong -> Viết code"
+  - from: "code"
+    to: "test"
+    name: "Code xong -> Kiểm thử"
+  - from: "test"
+    to: "evaluate_test"
+    name: "Test xong -> Đánh giá"
+  - from: "fix_code"
+    to: "test"
+    name: "Vá lỗi xong -> Re-test loop"
+  - from: "review"
+    to: "synthesize"
+    name: "Review xong -> Nghiệm thu"

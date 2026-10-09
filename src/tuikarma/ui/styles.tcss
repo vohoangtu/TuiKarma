@@ -55,12 +55,17 @@ Footer {
     height: 45%;
 }
 
+#workflow-dag-widget {
+    height: 4;
+    margin-bottom: 0;
+}
+
 #stream-box {
-    height: 65%;
+    height: 60%;
 }
 
 #inspector-box {
-    height: 35%;
+    height: 40%;
 }
 
 .panel-title {

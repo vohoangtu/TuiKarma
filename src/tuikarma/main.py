@@ -22,17 +22,27 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
-def run_headless_eval(task_spec: TaskSpec, llm: BaseLLMProvider) -> None:
+def run_headless_eval(task_spec: TaskSpec, llm: BaseLLMProvider, workflow_file: Optional[Path] = None) -> None:
     """Run benchmark task in headless mode (ideal for CI/CD and automated batch testing)."""
     provider_name = llm.__class__.__name__
-    print(f"\n[HARNESS HEADLESS] Chạy benchmark cho task: {task_spec.title} ({task_spec.id}) [Backend: {provider_name}]")
+    wf_desc = f" | Pipeline: {workflow_file.name}" if workflow_file else ""
+    print(f"\n[HARNESS HEADLESS] Chạy benchmark cho task: {task_spec.title} ({task_spec.id}) [Backend: {provider_name}{wf_desc}]")
     bus = EventBus()
     topology = SwarmTopology(bus, llm=llm)
     recorder = TrajectoryRecorder(bus)
     evaluator = TaskEvaluator(topology.workspace_dir, bus=bus)
 
     async def _execute():
-        await topology.execute_task_loop(task_spec.description)
+        if workflow_file and workflow_file.exists():
+            from tuikarma.workflow.parser import WorkflowParser
+            from tuikarma.workflow.state import WorkflowState
+            engine = WorkflowParser.load_from_yaml(workflow_file, topology)
+            topology.active_workflow = engine
+            initial_state = WorkflowState(task_description=task_spec.description, max_steps=engine.max_steps)
+            await engine.execute(initial_state)
+        else:
+            await topology.execute_task_loop(task_spec.description)
+
         result = await evaluator.evaluate_task(task_spec)
         print("\n" + "=" * 60)
         print(f"KẾT QUẢ ĐÁNH GIÁ (HARNESS VERDICT): {'PASSED' if result.passed else 'FAILED'}")
@@ -50,6 +60,7 @@ def run_headless_eval(task_spec: TaskSpec, llm: BaseLLMProvider) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="TUIKarma - Multi-Agent Harness & TUI Runner (2026)")
     parser.add_argument("--task", type=str, default="tasks/example_task.yaml", help="Path to task YAML specification")
+    parser.add_argument("--workflow", type=str, default=None, help="Path to declarative YAML workflow pipeline")
     parser.add_argument("--replay", type=str, default=None, help="Path to JSONL session trace file to replay")
     parser.add_argument("--backend", type=str, choices=["auto", "local", "scenario"], default="auto",
                         help="LLM backend: 'local' (http://localhost:20128/v1), 'scenario' (mock), or 'auto' (detect)")
@@ -68,11 +79,12 @@ def main() -> None:
 
     llm = get_default_llm_provider(force_backend=args.backend)
     replay_path = Path(args.replay) if args.replay else None
+    workflow_path = Path(args.workflow) if args.workflow else None
 
     if args.no_tui:
-        run_headless_eval(task, llm=llm)
+        run_headless_eval(task, llm=llm, workflow_file=workflow_path)
     else:
-        app = TUIKarmaApp(task_spec=task, replay_file=replay_path, llm=llm)
+        app = TUIKarmaApp(task_spec=task, workflow_file=workflow_path, replay_file=replay_path, llm=llm)
         app.run()
 
 

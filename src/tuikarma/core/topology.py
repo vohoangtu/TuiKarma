@@ -40,6 +40,7 @@ class SwarmTopology:
 
         self.agents: Dict[str, Agent] = {}
         self.blackboard: Dict[str, Any] = {}
+        self.active_workflow: Any = None
         self.is_paused = False
         self.step_event = asyncio.Event()
         self.step_event.set()  # Runs continuously by default
@@ -100,6 +101,8 @@ class SwarmTopology:
     def set_paused(self, paused: bool) -> None:
         """Pause or resume swarm execution."""
         self.is_paused = paused
+        if self.active_workflow:
+            self.active_workflow.set_paused(paused)
         if not paused:
             self.step_event.set()
         else:
@@ -107,6 +110,8 @@ class SwarmTopology:
 
     def step_forward(self) -> None:
         """Allow a single step forward during paused state."""
+        if self.active_workflow:
+            self.active_workflow.step_forward()
         self.step_event.set()
 
     async def _wait_if_paused(self) -> None:
@@ -118,45 +123,20 @@ class SwarmTopology:
                 self.step_event.clear()
 
     async def execute_task_loop(self, task_description: str, max_iterations: int = 5) -> None:
-        """Run the multi-agent collaboration loop on a given task."""
-        supervisor = self.agents["Supervisor"]
-        coder = self.agents["Coder"]
-        tester = self.agents["Tester"]
-        critic = self.agents["Critic"]
+        """Run the multi-agent collaboration loop through the Workflow Engine."""
+        from tuikarma.workflow.builder import build_self_healing_coding_workflow
+        from tuikarma.workflow.state import WorkflowState
 
-        # Step 1: Supervisor plans
-        await self._wait_if_paused()
-        resp1 = await supervisor.think_and_act(f"Mục tiêu nhiệm vụ: {task_description}", step=1)
-        await supervisor.set_state(AgentState.IDLE)
-        await self._emit_metrics(step=1, tokens_in=resp1.tokens_in, tokens_out=resp1.tokens_out, cost=resp1.cost_usd, latency=300)
+        engine = build_self_healing_coding_workflow(self)
+        self.active_workflow = engine
+        engine.set_paused(self.is_paused)
 
-        # Step 2: Coder implements
-        await self._wait_if_paused()
-        resp2 = await coder.think_and_act("Cài đặt mã nguồn cốt lõi theo kế hoạch của Supervisor.", step=2)
-        await coder.set_state(AgentState.WAITING, "Chờ Tester xác minh mã")
-        await self._emit_metrics(step=2, tokens_in=resp2.tokens_in, tokens_out=resp2.tokens_out, cost=resp2.cost_usd, latency=500)
+        initial_state = WorkflowState(task_description=task_description, max_steps=12)
+        await engine.execute(initial_state)
 
-        # Step 3: Tester writes tests and executes
-        await self._wait_if_paused()
-        resp3 = await tester.think_and_act("Thiết kế và chạy test suite để kiểm thử tính năng của Coder.", step=3)
-        await tester.set_state(AgentState.IDLE)
-        await self._emit_metrics(step=3, tokens_in=resp3.tokens_in, tokens_out=resp3.tokens_out, cost=resp3.cost_usd, latency=600)
-
-        # Step 4: Critic reviews
-        await self._wait_if_paused()
-        resp4 = await critic.think_and_act("Đánh giá toàn diện mã nguồn, test coverage và các rủi ro bảo mật.", step=4)
-        await critic.set_state(AgentState.COMPLETED)
-        await self._emit_metrics(step=4, tokens_in=resp4.tokens_in, tokens_out=resp4.tokens_out, cost=resp4.cost_usd, latency=400)
-
-        # Step 5: Final wrap-up
-        await self._wait_if_paused()
-        await supervisor.set_state(AgentState.COMPLETED)
-        await supervisor.speak(
-            "Nhiệm vụ đã hoàn tất thành công! Toàn bộ file mã nguồn và test suite đã được xác thực trong sandbox.",
-            step=5
-        )
-        await coder.set_state(AgentState.COMPLETED)
-        await tester.set_state(AgentState.COMPLETED)
+        # Mark all agents completed after workflow finishes
+        for agent in self.agents.values():
+            await agent.set_state(AgentState.COMPLETED)
 
     async def _emit_metrics(self, step: int, tokens_in: int, tokens_out: int, cost: float, latency: float) -> None:
         await self.bus.publish(

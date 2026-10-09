@@ -20,6 +20,16 @@ from tuikarma.core.events import (
     MetricsEvent,
     ToolApprovalRequestEvent,
     EvaluationResultEvent,
+    WorkflowStartedEvent,
+    WorkflowNodeStartedEvent,
+    WorkflowNodeCompletedEvent,
+    WorkflowTransitionEvent,
+    WorkflowCompletedEvent,
+    WorkflowNodeRetryEvent,
+    WorkflowFailedEvent,
+    WorkflowRollbackStartedEvent,
+    WorkflowNodeRollbackEvent,
+    WorkflowRollbackCompletedEvent,
     AgentState,
 )
 from tuikarma.core.event_bus import EventBus
@@ -28,6 +38,7 @@ from tuikarma.core.llm import BaseLLMProvider
 from tuikarma.harness.task import TaskSpec
 from tuikarma.harness.evaluator import TaskEvaluator
 from tuikarma.harness.trajectory import TrajectoryRecorder, TrajectoryReplayer
+from tuikarma.ui.widgets.dag_view import WorkflowDAGWidget
 
 
 class AgentMatrixWidget(Static):
@@ -82,10 +93,15 @@ class MetricsWidget(Static):
     total_cost = reactive(0.0)
     current_step = reactive(0)
     latency_ms = reactive(0.0)
+    active_node = reactive("Initializing...")
     eval_score = reactive("Pending...")
     eval_status = reactive("[dim]In Progress[/dim]")
 
     def on_mount(self) -> None:
+        self.update_display()
+
+    def update_node(self, event: WorkflowNodeStartedEvent) -> None:
+        self.active_node = f"{event.node_id} (Loop #{event.iteration})"
         self.update_display()
 
     def update_metrics(self, event: MetricsEvent) -> None:
@@ -108,7 +124,9 @@ class MetricsWidget(Static):
     def update_display(self) -> None:
         content = (
             "[bold cyan]═══ HARNESS TELEMETRY ═══[/bold cyan]\n\n"
-            f"[dim]Current Step:[/dim]      [bold yellow]{self.current_step} / 5[/bold yellow]\n"
+            f"[dim]Workflow Engine:[/dim]   [bold magenta]Active (DAG)[/bold magenta]\n"
+            f"[dim]Active Node:[/dim]       [bold yellow]{self.active_node}[/bold yellow]\n"
+            f"[dim]Workflow Steps:[/dim]    [bold yellow]{self.current_step}[/bold yellow]\n"
             f"[dim]Total Tokens:[/dim]      [bold green]{self.total_tokens:,}[/bold green]\n"
             f"[dim]Estimated Cost:[/dim]    [bold green]${self.total_cost:.4f}[/bold green]\n"
             f"[dim]Step Latency:[/dim]      [bold white]{self.latency_ms:.0f} ms[/bold white]\n"
@@ -129,6 +147,9 @@ class TUIKarmaApp(App):
     BINDINGS = [
         Binding("p", "toggle_pause", "Pause/Resume", show=True),
         Binding("s", "step_forward", "Step (Debug)", show=True),
+        Binding("n", "immediate_retry", "Retry Now", show=True),
+        Binding("k", "skip_node", "Skip Node", show=True),
+        Binding("b", "force_rollback", "Rollback", show=True),
         Binding("a", "approve_tool", "Approve Tool", show=True),
         Binding("r", "restart_task", "Restart Task", show=True),
         Binding("q", "quit", "Quit", show=True),
@@ -137,6 +158,7 @@ class TUIKarmaApp(App):
     def __init__(
         self,
         task_spec: Optional[TaskSpec] = None,
+        workflow_file: Optional[Path] = None,
         replay_file: Optional[Path] = None,
         llm: Optional[BaseLLMProvider] = None,
         **kwargs
@@ -148,6 +170,7 @@ class TUIKarmaApp(App):
             title="Async Token Bucket Rate Limiter",
             description="Multi-agent co-development and evaluation harness demo.",
         )
+        self.workflow_file = workflow_file
         self.replay_file = replay_file
         self.llm = llm
         self.topology = SwarmTopology(self.bus, llm=self.llm)
@@ -167,6 +190,7 @@ class TUIKarmaApp(App):
                     yield MetricsWidget(id="metrics-panel")
 
             with Vertical(id="right-content"):
+                yield WorkflowDAGWidget(id="workflow-dag-widget")
                 with Container(classes="box-panel", id="stream-box"):
                     yield Static("[bold cyan]═══ LIVE INTER-AGENT DIALOGUE & REASONING ═══[/bold cyan]")
                     yield RichLog(id="stream-log", highlight=True, markup=True, wrap=True)
@@ -175,9 +199,9 @@ class TUIKarmaApp(App):
                     yield RichLog(id="inspector-log", highlight=True, markup=True, wrap=True)
 
         with Horizontal(id="hitl-container"):
-            yield Static("⚡ HITL Injection:", id="hitl-label")
-            yield Input(placeholder="Type command or feedback for agents... (Press Enter to send)", id="hitl-input")
-            yield Static(r"[P] Pause | [S] Step | [A] Approve | [Q] Quit", id="hitl-key-guide")
+            yield Static("⚡ HITL:", id="hitl-label")
+            yield Input(placeholder="Commands: /retry-now, /skip, /rollback, /inject <guidance> or message...", id="hitl-input")
+            yield Static(r"[P] Pause | [N] Retry-Now | [K] Skip | [B] Rollback | [A] Approve", id="hitl-key-guide")
 
         yield Footer()
 
@@ -190,6 +214,16 @@ class TUIKarmaApp(App):
         self.bus.subscribe(MetricsEvent, self.handle_metrics_event)
         self.bus.subscribe(ToolApprovalRequestEvent, self.handle_approval_request)
         self.bus.subscribe(EvaluationResultEvent, self.handle_eval_event)
+        self.bus.subscribe(WorkflowStartedEvent, self.handle_workflow_started)
+        self.bus.subscribe(WorkflowNodeStartedEvent, self.handle_workflow_node_started)
+        self.bus.subscribe(WorkflowNodeCompletedEvent, self.handle_workflow_node_completed)
+        self.bus.subscribe(WorkflowTransitionEvent, self.handle_workflow_transition)
+        self.bus.subscribe(WorkflowCompletedEvent, self.handle_workflow_completed)
+        self.bus.subscribe(WorkflowNodeRetryEvent, self.handle_workflow_retry)
+        self.bus.subscribe(WorkflowFailedEvent, self.handle_workflow_failed)
+        self.bus.subscribe(WorkflowRollbackStartedEvent, self.handle_rollback_started)
+        self.bus.subscribe(WorkflowNodeRollbackEvent, self.handle_node_rollback)
+        self.bus.subscribe(WorkflowRollbackCompletedEvent, self.handle_rollback_completed)
 
         # Setup recording if not replaying
         if not self.replay_file:
@@ -210,7 +244,18 @@ class TUIKarmaApp(App):
     async def _run_task(self) -> None:
         """Run execution loop and trigger evaluator upon completion."""
         try:
-            await self.topology.execute_task_loop(self.task_spec.description)
+            if self.workflow_file and self.workflow_file.exists():
+                from tuikarma.workflow.parser import WorkflowParser
+                from tuikarma.workflow.state import WorkflowState
+                engine = WorkflowParser.load_from_yaml(self.workflow_file, self.topology)
+                self.topology.active_workflow = engine
+                engine.set_paused(self.is_paused)
+                dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+                dag_widget.set_pipeline_nodes(list(engine.nodes.keys()), workflow_name=engine.name)
+                initial_state = WorkflowState(task_description=self.task_spec.description, max_steps=engine.max_steps)
+                await engine.execute(initial_state)
+            else:
+                await self.topology.execute_task_loop(self.task_spec.description)
             # Run automated evaluation
             await asyncio.sleep(0.5)
             await self.evaluator.evaluate_task(self.task_spec)
@@ -291,6 +336,80 @@ class TUIKarmaApp(App):
         stream_log.write(f"[bold bright_yellow]🏆 [HARNESS EVALUATION VERDICT: {badge} - Score: {event.score*100:.1f}%][/bold bright_yellow]")
         stream_log.write(f"[dim]{event.feedback}[/dim]\n" + "═" * 70)
 
+    def handle_workflow_started(self, event: WorkflowStartedEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_started(event)
+        stream_log = self.query_one("#stream-log", RichLog)
+        stream_log.write(f"\n[bold dark_orange]🔄 [WORKFLOW LAUNCH][/bold dark_orange] DAG: [bold white]{event.workflow_name}[/bold white] ({event.total_nodes} nodes)\n")
+
+    def handle_workflow_node_started(self, event: WorkflowNodeStartedEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_node_started(event)
+        metrics_panel = self.query_one("#metrics-panel", MetricsWidget)
+        metrics_panel.update_node(event)
+        stream_log = self.query_one("#stream-log", RichLog)
+        agent_info = f" [bold magenta]({event.agent_name})[/bold magenta]" if event.agent_name else ""
+        stream_log.write(f"[bold yellow]▶ [NODE ENTER][/bold yellow] [bold white]{event.node_id}[/bold white]{agent_info} [dim](Loop #{event.iteration})[/dim]")
+
+    def handle_workflow_node_completed(self, event: WorkflowNodeCompletedEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_node_completed(event)
+
+    def handle_workflow_transition(self, event: WorkflowTransitionEvent) -> None:
+        stream_log = self.query_one("#stream-log", RichLog)
+        reason_str = f" [dim]({event.reason})[/dim]" if event.reason else ""
+        stream_log.write(f"[bold cyan]➔ [DAG TRANSITION][/bold cyan] {event.from_node} ➔ [bold white]{event.to_node}[/bold white]{reason_str}\n")
+
+    def handle_workflow_completed(self, event: WorkflowCompletedEvent) -> None:
+        stream_log = self.query_one("#stream-log", RichLog)
+        status_msg = "[bold green]🏁 [WORKFLOW HOÀN TẤT THÀNH CÔNG][/bold green]" if event.success else "[bold red]✖ [WORKFLOW THẤT BẠI][/bold red]"
+        stream_log.write(f"\n{status_msg} Total Steps: {event.total_steps} ({event.duration_ms:.0f}ms)\n")
+
+    def handle_workflow_retry(self, event: WorkflowNodeRetryEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_node_retry(event)
+        stream_log = self.query_one("#stream-log", RichLog)
+        stream_log.write(
+            f"\n[bold yellow]⏳ [RETRY POLICY #{event.attempt}/{event.max_retries}][/bold yellow] "
+            f"Nút [bold white]'{event.node_id}'[/bold white] gặp sự cố: [italic]{event.error_reason}[/italic]\n"
+            f"   [dim yellow]Đang chờ {event.delay_seconds:.0f}s... (Gõ '/retry-now' hoặc [bold white][N][/bold white] để retry ngay; [bold white][K][/bold white] để skip)[/dim yellow]"
+        )
+
+    def handle_workflow_failed(self, event: WorkflowFailedEvent) -> None:
+        stream_log = self.query_one("#stream-log", RichLog)
+        stream_log.write(
+            f"\n[bold red]✖ [WORKFLOW FAILED][/bold red] Nút [bold white]'{event.failed_node_id}'[/bold white] "
+            f"đã vượt quá số lần retry cho phép! Đang kích hoạt cơ chế bồi hoàn Rollback...\n"
+        )
+
+    def handle_rollback_started(self, event: WorkflowRollbackStartedEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_rollback_started(event)
+        inspector = self.query_one("#inspector-log", RichLog)
+        nodes_str = " ➔ ".join(event.nodes_to_rollback) if event.nodes_to_rollback else "(Không có bước nào)"
+        inspector.write(
+            f"\n[bold bright_red]↩ [ROLLBACK INITIATED][/bold bright_red] "
+            f"Thứ tự hoàn tác đảo ngược: [yellow]{nodes_str}[/yellow]\n"
+        )
+
+    def handle_node_rollback(self, event: WorkflowNodeRollbackEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_node_rollback(event)
+        inspector = self.query_one("#inspector-log", RichLog)
+        status_color = "yellow" if event.status == "STARTING" else "green" if event.status == "COMPLETED" else "red"
+        inspector.write(
+            f"[{status_color}]↩ [ROLLBACK {event.status}][/{status_color}] Nút '{event.node_id}': {event.details or ''}"
+        )
+
+    def handle_rollback_completed(self, event: WorkflowRollbackCompletedEvent) -> None:
+        dag_widget = self.query_one("#workflow-dag-widget", WorkflowDAGWidget)
+        dag_widget.handle_rollback_completed(event)
+        stream_log = self.query_one("#stream-log", RichLog)
+        inspector = self.query_one("#inspector-log", RichLog)
+        summary = f"Đã hoàn tất hoàn tác các nút: {event.rolled_back_nodes}"
+        stream_log.write(f"[bold bright_cyan]✔ [ROLLBACK HOÀN TẤT][/bold bright_cyan] {summary}\n")
+        inspector.write(f"[bold bright_cyan]✔ [ROLLBACK HOÀN TẤT][/bold bright_cyan] {summary}\n")
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         if not text:
@@ -305,6 +424,15 @@ class TUIKarmaApp(App):
             self.action_toggle_pause()
         elif cmd_lower in ["/step", "s"]:
             self.action_step_forward()
+        elif cmd_lower in ["/retry-now", "/retry", "n"]:
+            self.action_immediate_retry()
+        elif cmd_lower in ["/skip", "k"]:
+            self.action_skip_node()
+        elif cmd_lower in ["/rollback", "b"]:
+            self.action_force_rollback()
+        elif cmd_lower.startswith("/inject "):
+            guidance = text[8:].strip()
+            self.action_inject_guidance(guidance)
         elif cmd_lower in ["/approve", "a"]:
             self.action_approve_tool()
         elif cmd_lower in ["/restart", "r"]:
@@ -322,6 +450,30 @@ class TUIKarmaApp(App):
                     )
                 )
             )
+
+    def action_immediate_retry(self) -> None:
+        if self.topology.active_workflow:
+            self.topology.active_workflow.trigger_immediate_retry()
+            stream_log = self.query_one("#stream-log", RichLog)
+            stream_log.write("\n[bold yellow]⚡ [HITL ACTION][/bold yellow] Kích hoạt [bold white]RETRY NGAY LẬP TỨC[/bold white] (bỏ qua đếm lùi)!\n")
+
+    def action_skip_node(self) -> None:
+        if self.topology.active_workflow:
+            self.topology.active_workflow.skip_current_node()
+            stream_log = self.query_one("#stream-log", RichLog)
+            stream_log.write("\n[bold yellow]⚡ [HITL ACTION][/bold yellow] Bỏ qua nút hiện tại [bold white](SKIP NODE)[/bold white] và tiếp tục!\n")
+
+    def action_force_rollback(self) -> None:
+        if self.topology.active_workflow:
+            self.topology.active_workflow.force_rollback()
+            stream_log = self.query_one("#stream-log", RichLog)
+            stream_log.write("\n[bold bright_red]⚡ [HITL ACTION][/bold bright_red] Dừng retry và [bold white]KÍCH HOẠT SAGA ROLLBACK[/bold white] ngay lập tức!\n")
+
+    def action_inject_guidance(self, guidance: str) -> None:
+        if self.topology.active_workflow:
+            self.topology.active_workflow.inject_guidance(guidance)
+        stream_log = self.query_one("#stream-log", RichLog)
+        stream_log.write(f"\n[bold yellow]⚡ [HITL INJECTION][/bold yellow] Đã nạp chỉ dẫn cho lần retry kế tiếp: [italic]{guidance}[/italic]\n")
 
     def action_toggle_pause(self) -> None:
         self.is_paused = not self.is_paused

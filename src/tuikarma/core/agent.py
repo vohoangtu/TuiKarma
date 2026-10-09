@@ -122,15 +122,16 @@ class Agent:
         )
         return result
 
-    async def think_and_act(self, context: str, step: int = 0) -> LLMResponse:
+    async def think_and_act(self, context: str, step: int = 0, model_override: Optional[str] = None) -> LLMResponse:
         """Execute one complete reasoning and action step for the agent."""
         await self.set_state(AgentState.THINKING)
         self.memory.append({"role": "user", "content": context})
 
         tools_schema = list(self.tools.list_tools().values()) if self.tools else None
+        active_model = model_override or self.model_name
 
         response = await self.llm.generate(
-            model_name=self.model_name,
+            model_name=active_model,
             system_prompt=self.system_prompt,
             messages=self.memory,
             tools_schema=tools_schema

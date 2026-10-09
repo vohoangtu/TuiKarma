@@ -34,3 +34,6 @@ htmlcov/
 # Local data & Traces
 # Keep sample traces or ignore temporary outputs
 sandbox_workspace/
+traces/*.jsonl
+!traces/.gitkeep
+
