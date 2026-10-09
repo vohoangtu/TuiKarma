@@ -1,0 +1,18 @@
+id: "TASK-2026-001"
+title: "Triển khai Async Token Bucket Rate Limiter"
+description: "Xây dựng thuật toán Rate Limiter bất đồng bộ trong Python 3.14+, kèm unit test và phân tích độ phức tạp thuật toán."
+max_steps: 5
+timeout_seconds: 60
+criteria:
+  - name: "Code Correctness"
+    description: "Đầy đủ type annotations, xử lý thread-safe/async lock chuẩn."
+    weight: 0.4
+  - name: "Test Coverage"
+    description: "Tối thiểu 3 unit test cho acquire(), reject_burst(), refilling()."
+    weight: 0.4
+  - name: "Security & Review"
+    description: "Không xảy ra race condition hoặc leak memory."
+    weight: 0.2
+metadata:
+  difficulty: "Hard"
+  domain: "Concurrency & Distributed Systems"

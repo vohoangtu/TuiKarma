@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tuikarma"
+version = "0.1.0"
+description = "Modern Multi-Agent Orchestration & Evaluation Harness with Terminal UI"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "TUIKarma Team" }
+]
+dependencies = [
+    "textual>=1.0.0",
+    "rich>=13.7.0",
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0.1",
+    "typing-extensions>=4.10.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0"
+]
+
+[project.scripts]
+tuikarma = "tuikarma.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [".venv", "sandbox_workspace", "traces"]
+asyncio_mode = "strict"

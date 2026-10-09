@@ -1,0 +1,80 @@
+"""Entry point for running TUIKarma Multi-Agent Harness."""
+
+from __future__ import annotations
+import sys
+import asyncio
+import argparse
+from pathlib import Path
+
+from tuikarma.ui.app import TUIKarmaApp
+from tuikarma.harness.task import TaskSpec
+from tuikarma.core.event_bus import EventBus
+from tuikarma.core.topology import SwarmTopology
+from tuikarma.core.llm import get_default_llm_provider, BaseLLMProvider
+from tuikarma.harness.evaluator import TaskEvaluator
+from tuikarma.harness.trajectory import TrajectoryRecorder
+
+
+# Ensure UTF-8 output on Windows console
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+
+def run_headless_eval(task_spec: TaskSpec, llm: BaseLLMProvider) -> None:
+    """Run benchmark task in headless mode (ideal for CI/CD and automated batch testing)."""
+    provider_name = llm.__class__.__name__
+    print(f"\n[HARNESS HEADLESS] Chạy benchmark cho task: {task_spec.title} ({task_spec.id}) [Backend: {provider_name}]")
+    bus = EventBus()
+    topology = SwarmTopology(bus, llm=llm)
+    recorder = TrajectoryRecorder(bus)
+    evaluator = TaskEvaluator(topology.workspace_dir, bus=bus)
+
+    async def _execute():
+        await topology.execute_task_loop(task_spec.description)
+        result = await evaluator.evaluate_task(task_spec)
+        print("\n" + "=" * 60)
+        print(f"KẾT QUẢ ĐÁNH GIÁ (HARNESS VERDICT): {'PASSED' if result.passed else 'FAILED'}")
+        print(f"Điểm số: {result.score * 100:.1f}%")
+        print("Chi tiết tiêu chí:")
+        print(result.feedback)
+        print(f"Trace ghi tại: {recorder.trace_file}")
+        print("=" * 60)
+        return result.passed
+
+    success = asyncio.run(_execute())
+    sys.exit(0 if success else 1)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="TUIKarma - Multi-Agent Harness & TUI Runner (2026)")
+    parser.add_argument("--task", type=str, default="tasks/example_task.yaml", help="Path to task YAML specification")
+    parser.add_argument("--replay", type=str, default=None, help="Path to JSONL session trace file to replay")
+    parser.add_argument("--backend", type=str, choices=["auto", "local", "scenario"], default="auto",
+                        help="LLM backend: 'local' (http://localhost:20128/v1), 'scenario' (mock), or 'auto' (detect)")
+    parser.add_argument("--no-tui", action="store_true", help="Run in headless benchmark mode without TUI")
+    args = parser.parse_args()
+
+    task_path = Path(args.task)
+    if task_path.exists():
+        task = TaskSpec.from_yaml(str(task_path))
+    else:
+        task = TaskSpec(
+            id="DEFAULT-01",
+            title="Async Multi-Agent Co-Development",
+            description="Mô phỏng phối hợp phân tán giữa Supervisor, Coder, Tester và Critic.",
+        )
+
+    llm = get_default_llm_provider(force_backend=args.backend)
+    replay_path = Path(args.replay) if args.replay else None
+
+    if args.no_tui:
+        run_headless_eval(task, llm=llm)
+    else:
+        app = TUIKarmaApp(task_spec=task, replay_file=replay_path, llm=llm)
+        app.run()
+
+
+if __name__ == "__main__":
+    main()

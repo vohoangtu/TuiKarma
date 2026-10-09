@@ -1,0 +1,1 @@
+{"event_type": "StateChangeEvent", "data": {"id": "f86df4cd", "timestamp": "2026-10-09T12:21:35.421054", "agent_name": "Supervisor", "old_state": "IDLE", "new_state": "THINKING", "details": null}}

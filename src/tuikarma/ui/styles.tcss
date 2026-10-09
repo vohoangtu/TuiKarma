@@ -1,0 +1,107 @@
+Screen {
+    background: #0d1117;
+    color: #c9d1d9;
+    layout: vertical;
+}
+
+Header {
+    dock: top;
+    background: #161b22;
+    color: #58a6ff;
+    text-style: bold;
+}
+
+Footer {
+    dock: bottom;
+    background: #161b22;
+    color: #8b949e;
+}
+
+#main-container {
+    height: 1fr;
+    layout: horizontal;
+    padding: 0 1;
+}
+
+#left-sidebar {
+    width: 32%;
+    height: 100%;
+    layout: vertical;
+    margin-right: 1;
+}
+
+#right-content {
+    width: 68%;
+    height: 100%;
+    layout: vertical;
+}
+
+.box-panel {
+    border: round #30363d;
+    background: #161b22;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+.box-panel:focus {
+    border: round #58a6ff;
+}
+
+#agent-matrix-box {
+    height: 55%;
+}
+
+#metrics-box {
+    height: 45%;
+}
+
+#stream-box {
+    height: 65%;
+}
+
+#inspector-box {
+    height: 35%;
+}
+
+.panel-title {
+    color: #58a6ff;
+    text-style: bold;
+    margin-bottom: 1;
+    border-bottom: solid #30363d;
+}
+
+#hitl-container {
+    height: 3;
+    dock: bottom;
+    layout: horizontal;
+    background: #161b22;
+    border-top: solid #30363d;
+    padding: 0 1;
+    align: center middle;
+}
+
+#hitl-label {
+    width: 18;
+    color: #58a6ff;
+    text-style: bold;
+    padding-top: 1;
+}
+
+#hitl-input {
+    width: 1fr;
+    background: #0d1117;
+    border: none;
+    color: #f0f6fc;
+}
+
+#hitl-input:focus {
+    border: none;
+    background: #21262d;
+}
+
+#hitl-key-guide {
+    width: 42;
+    color: #8b949e;
+    text-align: right;
+    padding-top: 1;
+}
