@@ -76,6 +76,14 @@ Mục tiêu cấp cao của người dùng:
 {lessons_context}
 
 Hãy phân tích và phân rã mục tiêu trên thành từ 3 đến 5 Cột mốc (Milestones) tuần tự để đàn Agent (Coder, Tester, Critic) thi công độc lập.
+Lưu ý quan trọng cho dự án Đa Repo / Full-stack (chứa cả backend/api và frontend/web):
+- Nếu mục tiêu yêu cầu thay đổi cả 2 bên, hãy lập các Milestone rõ ràng theo thứ tự phụ thuộc tự nhiên:
+  + Cột mốc 1: Thiết kế giao diện API / Contract (API specs, request/response models).
+  + Cột mốc 2: Triển khai Backend / API (migrations, controllers, endpoints). Deliverables ghi đúng tiền tố thư mục con (ví dụ: nextech-api/app/...).
+  + Cột mốc 3: Triển khai Frontend / Web (gọi API mới, cập nhật UI components, state). Deliverables ghi đúng tiền tố thư mục con (ví dụ: nextech-web/src/...).
+  + Cột mốc 4: Kiểm thử tích hợp Full-stack và nghiệm thu liên thông giữa Web và API.
+Tránh dồn lẫn lộn không rõ thứ tự phụ thuộc giữa API và UI.
+
 Trả về định dạng JSON DUY NHẤT (không kèm markdown) theo cấu trúc:
 {{
   "project_name": "Tên dự án ngắn gọn",
@@ -85,8 +93,8 @@ Trả về định dạng JSON DUY NHẤT (không kèm markdown) theo cấu trú
       "id": "M1",
       "title": "Tên cột mốc 1",
       "goal": "Yêu cầu chi tiết",
-      "deliverables": ["file1.py", "file2.py"],
-      "acceptance_criteria": ["Đạt chuẩn PEP-8", "Xử lý lỗi đầy đủ"]
+      "deliverables": ["đường_dẫn_tệp_cần_sửa_hoặc_tạo"],
+      "acceptance_criteria": ["Tiêu chí nghiệm thu 1", "Tiêu chí nghiệm thu 2"]
     }}
   ]
 }}
@@ -118,7 +126,44 @@ Trả về định dạng JSON DUY NHẤT (không kèm markdown) theo cấu trú
         is_existing = bool(codebase_summary and codebase_summary.get("total_files", 0) > 0)
         proj_name = codebase_summary.get("project_name", "Autonomous Project") if is_existing else "Autonomous Project"
 
-        if is_existing:
+        sample = codebase_summary.get("files_sample", []) if codebase_summary else []
+        configs = codebase_summary.get("key_configs", []) if codebase_summary else []
+        all_signals = sample + configs
+        has_api = any("api" in f.lower() for f in all_signals)
+        has_web = any("web" in f.lower() or "client" in f.lower() for f in all_signals)
+
+        if is_existing and has_api and has_web:
+            milestones = [
+                Milestone(
+                    id="M1",
+                    title="Khảo sát Full-Stack & Thiết lập Hợp đồng API (API Contract)",
+                    goal=f"Phân tích cấu trúc nextech-api và nextech-web, xác định endpoints và schema cho: {goal}",
+                    deliverables=["docs/api_contract.md"],
+                    acceptance_criteria=["Xác định chuẩn Request/Response", "Tương thích cả 2 repo"],
+                ),
+                Milestone(
+                    id="M2",
+                    title="Phát triển Backend API & Cơ sở Dữ liệu (nextech-api)",
+                    goal=f"Triển khai migrations, logic nghiệp vụ và endpoints tại nextech-api cho: {goal}",
+                    deliverables=["nextech-api/app/", "nextech-api/routes/"],
+                    acceptance_criteria=["Endpoints trả về đúng HTTP status", "Xử lý validation đầy đủ"],
+                ),
+                Milestone(
+                    id="M3",
+                    title="Phát triển Giao diện Frontend Web & Tích hợp (nextech-web)",
+                    goal=f"Cập nhật UI components, state management và gọi API mới tại nextech-web cho: {goal}",
+                    deliverables=["nextech-web/src/components/", "nextech-web/src/context/"],
+                    acceptance_criteria=["Giao diện phản hồi chuẩn xác", "Kết nối thành công với backend"],
+                ),
+                Milestone(
+                    id="M4",
+                    title="Kiểm thử Tích hợp Liên thông Đầu-Cuối (End-to-End E2E)",
+                    goal="Chạy kiểm thử xác nhận luồng hoạt động mượt mà từ Web UI đến API Backend",
+                    deliverables=["tests/e2e_integration_test.py"],
+                    acceptance_criteria=["100% test cases pass", "Không phát sinh lỗi hồi quy"],
+                ),
+            ]
+        elif is_existing:
             milestones = [
                 Milestone(
                     id="M1",
