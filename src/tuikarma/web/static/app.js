@@ -662,7 +662,7 @@ class TUIKarmaWebClient {
     }
 
     this.statusVal.textContent = "PLANNING";
-    this.appendTerminalLine("cmd", `[AUTOPILOT] Mở dự án tại '${folderPath}', nạp mục tiêu: ${goal}`);
+    this.appendTerminalLine("cmd", `[GIAO VIỆC] Mở dự án tại '${folderPath}', nhận mục tiêu: ${goal}`);
 
     try {
       const res = await fetch("/api/autopilot/start", {
@@ -677,14 +677,14 @@ class TUIKarmaWebClient {
 
       if (!res.ok) {
         const err = await res.json();
-        alert(`Không thể bắt đầu AutoPilot: ${err.detail || "Lỗi máy chủ"}`);
+        alert(`Không thể bắt đầu thực thi: ${err.detail || "Lỗi máy chủ"}`);
         return;
       }
       const data = await res.json();
-      this.appendTerminalLine("res", `[AUTOPILOT] Đã kích hoạt AutoPilot trên codebase: ${data.project_path}`);
+      this.appendTerminalLine("res", `[GIAO VIỆC] Đã nhận nhiệm vụ và bắt đầu thực thi trên codebase: ${data.project_path}`);
       this.fetchProjects();
     } catch (err) {
-      alert(`Lỗi kết nối AutoPilot: ${err}`);
+      alert(`Lỗi kết nối máy chủ: ${err}`);
     }
   }
 
@@ -696,7 +696,7 @@ class TUIKarmaWebClient {
     }
 
     this.btnScanCodebase.disabled = true;
-    this.btnScanCodebase.textContent = "⌛ Đang phân tích Codebase...";
+    this.btnScanCodebase.textContent = "⌛ Đang khảo sát Codebase...";
 
     try {
       const res = await fetch("/api/projects/open", {
@@ -709,7 +709,7 @@ class TUIKarmaWebClient {
         const err = await res.json();
         alert(`Lỗi khảo sát: ${err.detail}`);
         this.btnScanCodebase.disabled = false;
-        this.btnScanCodebase.textContent = "🔍 Quét & Khảo sát Codebase";
+        this.btnScanCodebase.textContent = "🔍 Quét & Khảo sát Codebase này";
         return;
       }
 
@@ -728,7 +728,7 @@ class TUIKarmaWebClient {
       alert(`Lỗi scan: ${err}`);
     } finally {
       this.btnScanCodebase.disabled = false;
-      this.btnScanCodebase.textContent = "🔍 Quét & Khảo sát Codebase";
+      this.btnScanCodebase.textContent = "🔍 Quét & Khảo sát Codebase này";
     }
   }
 

@@ -45,10 +45,10 @@
     
     <!-- Left Sidebar: Task Assignment & Project Workspace -->
     <aside class="sidebar" id="sidebar">
-      <!-- Mode Toggle: Single Task vs Project AutoPilot -->
+      <!-- Mode Toggle: Single Task vs Project Codebase -->
       <div class="sidebar-mode-toggle">
         <button type="button" class="mode-tab-btn active" id="tab-mode-task">⚡ Nhiệm vụ lẻ</button>
-        <button type="button" class="mode-tab-btn" id="tab-mode-project">🚀 Dự án & AutoPilot</button>
+        <button type="button" class="mode-tab-btn" id="tab-mode-project">🚀 Dự án (Codebase)</button>
       </div>
 
       <!-- Mode 1: Ad-hoc Task Runner -->
@@ -111,7 +111,7 @@
       <div id="panel-project-autopilot" style="display: none;">
         <div class="mica-surface" style="padding: 18px;">
           <div class="panel-header">
-            <h2><span>🚀</span> Không gian Dự án</h2>
+            <h2><span>🚀</span> Không gian Dự án (Codebase)</h2>
           </div>
 
           <!-- Recent Projects Selector -->
@@ -136,14 +136,14 @@
             </div>
             <div class="form-group">
               <label for="new-proj-goal">Mục tiêu tổng thể (Goal):</label>
-              <textarea id="new-proj-goal" class="fluent-textarea" placeholder="Mô tả toàn bộ yêu cầu dự án. AutoPilot sẽ tự phân rã thành các cột mốc tuần tự..." required></textarea>
+              <textarea id="new-proj-goal" class="fluent-textarea" placeholder="Mô tả toàn bộ yêu cầu dự án. Hệ thống sẽ tự phân rã thành các cột mốc tuần tự..." required></textarea>
             </div>
             <div class="form-group">
               <label for="new-proj-dir">Thư mục lưu trữ (Tùy chọn):</label>
               <input type="text" id="new-proj-dir" class="fluent-input" placeholder="Mặc định: projects/...">
             </div>
             <button type="submit" class="btn-primary" id="btn-start-new-autopilot">
-              <span>⚡</span> Bắt đầu Tự hành AutoPilot
+              <span>🚀</span> Tạo Dự án & Bắt đầu Thực thi
             </button>
           </form>
 
@@ -153,21 +153,25 @@
               <label for="open-proj-path">Đường dẫn thư mục máy tính:</label>
               <div style="display: flex; gap: 6px;">
                 <input type="text" id="open-proj-path" class="fluent-input" placeholder="C:\Users\...\MyProject" required style="flex: 1;">
-                <button type="button" class="btn-fluent" id="btn-open-browser-modal" title="Duyệt thư mục">📂</button>
+                <button type="button" class="btn-fluent" id="btn-open-browser-modal" title="Duyệt thư mục" style="padding: 6px 12px;">📂 Duyệt</button>
               </div>
+              <button type="button" class="btn-fluent" id="btn-scan-codebase" style="width: 100%; margin-top: 6px; font-size: 0.8rem; padding: 6px 10px;">
+                🔍 Quét & Khảo sát Codebase này
+              </button>
             </div>
-            <div class="form-group">
-              <label for="open-proj-goal">Mục tiêu cần làm trên codebase:</label>
-              <textarea id="open-proj-goal" class="fluent-textarea" placeholder="Ví dụ: Refactor module authentication sang async, bổ sung test coverage lên 90%..."></textarea>
-            </div>
-            <button type="button" class="btn-fluent" id="btn-scan-codebase" style="width: 100%;">
-              🔍 Quét & Khảo sát Codebase
-            </button>
+
+            <!-- Kết quả khảo sát codebase hiển thị ngay dưới thư mục -->
             <div id="codebase-summary-box" class="codebase-card" style="display: none;">
               <!-- Dynamic codebase summary -->
             </div>
+
+            <div class="form-group">
+              <label for="open-proj-goal">Mục tiêu cần làm trên codebase:</label>
+              <textarea id="open-proj-goal" class="fluent-textarea" placeholder="Ví dụ: Review bảo mật, refactor authentication, bổ sung test coverage..."></textarea>
+            </div>
+
             <button type="submit" class="btn-primary" id="btn-start-existing-autopilot">
-              <span>⚡</span> Kích hoạt AutoPilot trên Codebase
+              <span>🚀</span> Giao việc & Bắt đầu Thực thi
             </button>
           </form>
         </div>
