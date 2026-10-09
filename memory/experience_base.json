@@ -6,7 +6,7 @@
     "root_cause": "Shared mutable state without mutex lock in Python asyncio",
     "lesson_learned": "Khi cập nhật state dùng chung trong async code, luôn phải bảo vệ bằng `async with self._lock:`.",
     "recommended_pattern": "self._lock = asyncio.Lock()\nasync with self._lock:\n    # update shared counters safe from race conditions",
-    "applied_count": 4,
+    "applied_count": 5,
     "created_at": 1791535333.6825838
   },
   {
@@ -16,7 +16,7 @@
     "root_cause": "Import path discrepancy between test execution cwd and source root",
     "lesson_learned": "Thiết lập sys.path chuẩn hoặc dùng relative/absolute package imports đồng nhất trong test suite.",
     "recommended_pattern": "import sys\nfrom pathlib import Path\nsys.path.insert(0, str(Path(__file__).resolve().parent.parent))",
-    "applied_count": 4,
+    "applied_count": 5,
     "created_at": 1791535333.6825907
   },
   {
@@ -26,7 +26,7 @@
     "root_cause": "str.format() treats raw python code braces {dictionary} as template placeholders",
     "lesson_learned": "Không dùng str.format() với code có ngoặc nhọn; hãy dùng explicit replace placeholder an toàn.",
     "recommended_pattern": "prompt.replace(f'{{{key}}}', str(value))",
-    "applied_count": 4,
+    "applied_count": 5,
     "created_at": 1791535333.6825962
   }
 ]
