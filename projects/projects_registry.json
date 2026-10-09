@@ -1,0 +1,26 @@
+[
+  {
+    "id": "PROJ-1791535618-api_created_",
+    "name": "API Created Project",
+    "path": "C:\\Users\\vohoa\\AppData\\Local\\Temp\\pytest-of-vohoa\\pytest-45\\test_web_api_project_endpoints0\\api_test_project",
+    "is_new": true,
+    "goal": "Inspect project",
+    "status": "INITIALIZED",
+    "created_at": 1791535618.910715,
+    "updated_at": 1791535618.9153721,
+    "milestones": [],
+    "tags": []
+  },
+  {
+    "id": "PROJ-1791535630-api_created_",
+    "name": "API Created Project",
+    "path": "C:\\Users\\vohoa\\AppData\\Local\\Temp\\pytest-of-vohoa\\pytest-46\\test_web_api_project_endpoints0\\api_test_project",
+    "is_new": true,
+    "goal": "Inspect project",
+    "status": "INITIALIZED",
+    "created_at": 1791535630.469953,
+    "updated_at": 1791535630.4749923,
+    "milestones": [],
+    "tags": []
+  }
+]

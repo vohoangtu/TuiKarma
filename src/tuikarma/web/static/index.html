@@ -43,64 +43,156 @@
   <!-- Main Container -->
   <main class="main-container" id="main-container">
     
-    <!-- Left Sidebar: Task Assignment & Pipeline Launcher -->
+    <!-- Left Sidebar: Task Assignment & Project Workspace -->
     <aside class="sidebar" id="sidebar">
-      <div class="mica-surface" style="padding: 18px;">
-        <div class="panel-header">
-          <h2><span>🚀</span> Giao việc cho Swarm</h2>
-        </div>
-
-        <form id="launch-form" style="display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
-          <div class="form-group">
-            <label for="task-prompt">Yêu cầu công việc (Prompt):</label>
-            <textarea id="task-prompt" class="fluent-textarea" placeholder="Nhập yêu cầu (ví dụ: Xây dựng Async Token Bucket Rate Limiter có unit test)..." required></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="pipeline-select">Quy trình (Workflow Pipeline):</label>
-            <select id="pipeline-select" class="fluent-select">
-              <option value="tasks/pipelines/dynamic_hitl_pipeline.yaml">Dynamic Routing & HITL Approval</option>
-              <option value="tasks/pipelines/parallel_tdd_pipeline.yaml">Parallel Fork-Join TDD (Song song)</option>
-              <option value="tasks/pipelines/self_healing_coding.yaml">Self-Healing Coding (Tự sửa lỗi)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="backend-select">LLM Backend Gateway:</label>
-            <select id="backend-select" class="fluent-select">
-              <option value="local">Antigravity Gateway (http://localhost:20128/v1)</option>
-              <option value="scenario">Deterministic Scenario (Offline Mock)</option>
-              <option value="auto" selected>Auto Detect (Tự nhận diện)</option>
-            </select>
-          </div>
-
-          <button type="submit" class="btn-primary" id="btn-launch-task">
-            <span>▶</span> Khởi chạy Swarm
-          </button>
-        </form>
+      <!-- Mode Toggle: Single Task vs Project AutoPilot -->
+      <div class="sidebar-mode-toggle">
+        <button type="button" class="mode-tab-btn active" id="tab-mode-task">⚡ Nhiệm vụ lẻ</button>
+        <button type="button" class="mode-tab-btn" id="tab-mode-project">🚀 Dự án & AutoPilot</button>
       </div>
 
-      <!-- Quick Preset Tasks -->
-      <div class="mica-surface" style="padding: 16px;">
-        <div class="panel-header">
-          <h2><span>💡</span> Kịch bản mẫu có sẵn</h2>
+      <!-- Mode 1: Ad-hoc Task Runner -->
+      <div id="panel-task-runner">
+        <div class="mica-surface" style="padding: 18px;">
+          <div class="panel-header">
+            <h2><span>⚡</span> Giao việc cho Swarm</h2>
+          </div>
+
+          <form id="launch-form" style="display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
+            <div class="form-group">
+              <label for="task-prompt">Yêu cầu công việc (Prompt):</label>
+              <textarea id="task-prompt" class="fluent-textarea" placeholder="Nhập yêu cầu (ví dụ: Xây dựng Async Token Bucket Rate Limiter có unit test)..." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="pipeline-select">Quy trình (Workflow Pipeline):</label>
+              <select id="pipeline-select" class="fluent-select">
+                <option value="tasks/pipelines/dynamic_hitl_pipeline.yaml">Dynamic Routing & HITL Approval</option>
+                <option value="tasks/pipelines/parallel_tdd_pipeline.yaml">Parallel Fork-Join TDD (Song song)</option>
+                <option value="tasks/pipelines/self_healing_coding.yaml">Self-Healing Coding (Tự sửa lỗi)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="backend-select">LLM Backend Gateway:</label>
+              <select id="backend-select" class="fluent-select">
+                <option value="local">Antigravity Gateway (http://localhost:20128/v1)</option>
+                <option value="scenario">Deterministic Scenario (Offline Mock)</option>
+                <option value="auto" selected>Auto Detect (Tự nhận diện)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-primary" id="btn-launch-task">
+              <span>▶</span> Khởi chạy Swarm
+            </button>
+          </form>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-          <button type="button" class="btn-fluent preset-btn" data-prompt="Triển khai thuật toán Async Token Bucket Rate Limiter trong Python 3.14+, kèm unit test và phân tích concurrency.">
-            Rate Limiter (Concurrency)
-          </button>
-          <button type="button" class="btn-fluent preset-btn" data-prompt="Xây dựng Async LRU Cache với cơ chế TTL hết hạn và xử lý luồng an toàn.">
-            Async LRU Cache (Memory)
-          </button>
-          <button type="button" class="btn-fluent preset-btn" data-prompt="Thiết kế JWT Auth Middleware với kiểm tra chữ ký và blacklist token thu hồi.">
-            JWT Auth Middleware (Security)
-          </button>
+
+        <!-- Quick Preset Tasks -->
+        <div class="mica-surface" style="padding: 16px; margin-top: 14px;">
+          <div class="panel-header">
+            <h2><span>💡</span> Kịch bản mẫu có sẵn</h2>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+            <button type="button" class="btn-fluent preset-btn" data-prompt="Triển khai thuật toán Async Token Bucket Rate Limiter trong Python 3.14+, kèm unit test và phân tích concurrency.">
+              Rate Limiter (Concurrency)
+            </button>
+            <button type="button" class="btn-fluent preset-btn" data-prompt="Xây dựng Async LRU Cache với cơ chế TTL hết hạn và xử lý luồng an toàn.">
+              Async LRU Cache (Memory)
+            </button>
+            <button type="button" class="btn-fluent preset-btn" data-prompt="Thiết kế JWT Auth Middleware với kiểm tra chữ ký và blacklist token thu hồi.">
+              JWT Auth Middleware (Security)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode 2: Long-Running Project Workspace & AutoPilot -->
+      <div id="panel-project-autopilot" style="display: none;">
+        <div class="mica-surface" style="padding: 18px;">
+          <div class="panel-header">
+            <h2><span>🚀</span> Không gian Dự án</h2>
+          </div>
+
+          <!-- Recent Projects Selector -->
+          <div class="form-group" style="margin-top: 12px;">
+            <label for="recent-projects-select">Dự án đã lưu gần đây:</label>
+            <select id="recent-projects-select" class="fluent-select">
+              <option value="">-- Chọn dự án để tiếp tục --</option>
+            </select>
+          </div>
+
+          <!-- Sub-toggle: New Project vs Open Existing -->
+          <div class="sub-toggle-group" style="margin-top: 12px;">
+            <button type="button" class="sub-toggle-btn active" id="btn-sub-new">➕ Tạo Mới</button>
+            <button type="button" class="sub-toggle-btn" id="btn-sub-open">📂 Mở Thư Mục</button>
+          </div>
+
+          <!-- Subform: Create New Project -->
+          <form id="new-project-form" style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="form-group">
+              <label for="new-proj-name">Tên dự án:</label>
+              <input type="text" id="new-proj-name" class="fluent-input" placeholder="Ví dụ: Highload Payment Gateway" required>
+            </div>
+            <div class="form-group">
+              <label for="new-proj-goal">Mục tiêu tổng thể (Goal):</label>
+              <textarea id="new-proj-goal" class="fluent-textarea" placeholder="Mô tả toàn bộ yêu cầu dự án. AutoPilot sẽ tự phân rã thành các cột mốc tuần tự..." required></textarea>
+            </div>
+            <div class="form-group">
+              <label for="new-proj-dir">Thư mục lưu trữ (Tùy chọn):</label>
+              <input type="text" id="new-proj-dir" class="fluent-input" placeholder="Mặc định: projects/...">
+            </div>
+            <button type="submit" class="btn-primary" id="btn-start-new-autopilot">
+              <span>⚡</span> Bắt đầu Tự hành AutoPilot
+            </button>
+          </form>
+
+          <!-- Subform: Open Existing Local Directory -->
+          <form id="open-project-form" style="display: none; flex-direction: column; gap: 12px;">
+            <div class="form-group">
+              <label for="open-proj-path">Đường dẫn thư mục máy tính:</label>
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="open-proj-path" class="fluent-input" placeholder="C:\Users\...\MyProject" required style="flex: 1;">
+                <button type="button" class="btn-fluent" id="btn-open-browser-modal" title="Duyệt thư mục">📂</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="open-proj-goal">Mục tiêu cần làm trên codebase:</label>
+              <textarea id="open-proj-goal" class="fluent-textarea" placeholder="Ví dụ: Refactor module authentication sang async, bổ sung test coverage lên 90%..."></textarea>
+            </div>
+            <button type="button" class="btn-fluent" id="btn-scan-codebase" style="width: 100%;">
+              🔍 Quét & Khảo sát Codebase
+            </button>
+            <div id="codebase-summary-box" class="codebase-card" style="display: none;">
+              <!-- Dynamic codebase summary -->
+            </div>
+            <button type="submit" class="btn-primary" id="btn-start-existing-autopilot">
+              <span>⚡</span> Kích hoạt AutoPilot trên Codebase
+            </button>
+          </form>
         </div>
       </div>
     </aside>
 
     <!-- Right Workspace Area -->
     <section class="content-area" id="content-area">
+
+      <!-- Milestones Progress Ribbon (AutoPilot Active) -->
+      <div class="mica-surface milestone-ribbon" id="milestone-ribbon" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.15rem;">🧭</span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.88rem;" id="active-project-title">Dự án Tự hành</div>
+              <div style="font-size: 0.72rem; color: var(--text-tertiary);" id="active-project-path-badge">...</div>
+            </div>
+          </div>
+          <span class="brand-badge" id="milestone-progress-badge">0/0 Milestones</span>
+        </div>
+        <div class="milestones-steps" id="milestones-steps">
+          <!-- Dynamically injected milestone cards -->
+        </div>
+      </div>
       
       <!-- Visual Workflow Pipeline DAG Canvas -->
       <div class="mica-surface dag-canvas-container" id="dag-container">
@@ -210,7 +302,8 @@
         <div class="tabs-header">
           <button type="button" class="tab-btn active" data-tab="tab-dialogue">💬 Live Dialogue & CoT</button>
           <button type="button" class="tab-btn" data-tab="tab-inspector">⚙️ Tool Inspector</button>
-          <button type="button" class="tab-btn" data-tab="tab-sandbox">📁 Sandbox Workspace Files</button>
+          <button type="button" class="tab-btn" data-tab="tab-sandbox">📁 Mã nguồn Workspace</button>
+          <button type="button" class="tab-btn" data-tab="tab-memory">🧠 Trí nhớ Tích lũy (Reflexion)</button>
         </div>
 
         <!-- Tab 1: Live Dialogue -->
@@ -220,7 +313,7 @@
               <div class="dialogue-avatar">⚡</div>
               <div class="dialogue-bubble">
                 <div class="dialogue-sender">HỆ THỐNG</div>
-                <div>Chào mừng đến với TUIKarma Light Fluent 2 Mica Dashboard. Hãy chọn một kịch bản hoặc nhập yêu cầu để bắt đầu.</div>
+                <div>Chào mừng đến với TUIKarma Light Fluent 2 Mica Dashboard. Bạn có thể giao việc đơn lẻ hoặc mở toàn bộ Dự án để AutoPilot tự hành qua các cột mốc.</div>
               </div>
             </div>
           </div>
@@ -244,10 +337,49 @@
             </div>
           </div>
         </div>
+
+        <!-- Tab 4: Reflexion Memory Lessons -->
+        <div class="tab-content" id="tab-memory">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="font-size: 0.82rem; color: var(--text-secondary);">
+              Các bài học kinh nghiệm và quy tắc lập trình (Reflexion Lessons) được tích lũy liên tục qua các dự án.
+            </div>
+            <button type="button" class="btn-fluent" id="btn-refresh-lessons" style="font-size: 0.75rem; padding: 4px 10px;">🔄 Làm mới</button>
+          </div>
+          <div class="lessons-grid" id="lessons-grid">
+            <!-- Rendered lesson cards -->
+          </div>
+        </div>
       </div>
 
     </section>
   </main>
+
+  <!-- Folder Browser Modal Dialog -->
+  <div class="modal-backdrop" id="folder-browser-modal" style="display: none;">
+    <div class="mica-surface modal-dialog">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.2rem;">📂</span>
+          <h3 style="font-size: 0.95rem; font-weight: 600;">Duyệt Thư mục trên Máy tính</h3>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-close-browser">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="browser-nav-bar">
+          <button type="button" class="btn-fluent" id="btn-folder-up">⬆ Lên thư mục cha</button>
+          <span class="current-browser-path" id="current-browser-path">...</span>
+        </div>
+        <div class="browser-folder-list" id="browser-folder-list">
+          <!-- Rendered folders -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-fluent" id="btn-cancel-browser">Hủy</button>
+        <button type="button" class="btn-primary" id="btn-select-folder">✔ Chọn thư mục này</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

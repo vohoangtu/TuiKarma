@@ -74,17 +74,36 @@ Trực quan hóa và điều khiển đàn Agent trên giao diện web hiện đ
 .\.venv\Scripts\python.exe main.py --web --port 8080
 ```
 Mở trình duyệt tại: `http://localhost:8080`
+- **Project Workspace & AutoPilot Launcher**: Chuyển đổi giữa chế độ *Nhiệm vụ lẻ* và *Dự án dài hạn*. Hỗ trợ tạo dự án mới hoặc mở thư mục máy tính có sẵn bằng Folder Browser Modal.
+- **Milestone Progress Tracker**: Theo dõi tiến độ từng cột mốc (M1, M2, M3...) với badge trạng thái động (Pending, In Progress, Completed).
+- **Reflexion Memory Tab**: Xem các bài học kinh nghiệm mà AI tự đúc kết sau các lỗi và thành công để tránh lặp lại bug.
 - **Visual DAG Canvas**: Xem trực quan luồng nodes, hiệu ứng pulse khi chạy, highlight cổng HITL và rollback.
 - **Agent Matrix Cards**: Theo dõi trạng thái CoT, model routing của từng Agent trong Swarm.
 - **HITL Command Ribbon**: Phê duyệt (`[A]`), Từ chối (`[D]`), Tạm dừng, Bước tiếp, Rollback hoặc nạp chỉ dẫn trực tiếp bằng chuột và phím tắt.
-- **Sandbox Code Viewer**: Duyệt cây tệp và xem mã nguồn được sinh ra trong sandbox theo thời gian thực.
+- **Workspace Code Viewer**: Duyệt cây tệp và xem mã nguồn dự án được sinh ra theo thời gian thực.
 
-### 4. Cách giao việc cho Swarm (3 phương thức linh hoạt)
+### 4. Vận hành Dự án Dài hạn với AutoPilot (Long-Running Autonomous Swarm)
+Để giải quyết bài toán chạy các dự án phần mềm thực thụ kéo dài hàng giờ, nhiều ngày hoặc treo máy qua đêm:
+1. **Phân rã Đa Cột mốc (Autonomous Planner)**: Thay vì dồn mọi thứ vào 1 lần chạy, hệ thống tự động phân tích mục tiêu và phân rã thành 3–5 Cột mốc (Milestones: M1 ➔ M2 ➔ M3) có tiêu chí nghiệm thu độc lập.
+2. **Khảo sát Codebase có sẵn**: Khi mở thư mục dự án trên máy, hệ thống tự động scan cấu trúc, phát hiện file cấu hình chính (`pyproject.toml`, `package.json`,...) và kiểu tệp để nạp ngữ cảnh cho Agent.
+3. **Reflexion Experience Memory**: Tự học và tích lũy tri thức sau mỗi lỗi cú pháp, race condition, concurrency vào `memory/experience_base.json` để đàn Agent tự điều chỉnh ở các cột mốc sau.
+4. **Checkpoint & Saga Rollback**: Lưu trạng thái file trên đĩa sau mỗi milestone, bảo toàn tiến độ ngay cả khi tắt máy hoặc mạng gián đoạn.
+
+#### Khởi chạy AutoPilot từ dòng lệnh:
+```powershell
+# Tạo dự án mới và tự hành hoàn toàn:
+.\.venv\Scripts\python.exe main.py --autopilot "Xây dựng hệ thống Async LRU Cache có TTL và benchmark suite" --project-name "CacheEngine" --backend local
+
+# Mở thư mục dự án có sẵn trên máy để tiếp tục phát triển / refactor:
+.\.venv\Scripts\python.exe main.py --autopilot "Bổ sung test suite TDD và tối ưu xử lý ngoại lệ" --project-dir "C:\Users\...\MyProject" --backend local
+```
+
+### 5. Cách giao việc cho Swarm (3 phương thức linh hoạt)
 
 #### 🔹 Cách A: Giao việc nhanh trực tiếp bằng dòng lệnh (`--prompt` hoặc `-p`)
 Không cần tạo file, gõ trực tiếp yêu cầu từ Terminal:
 ```powershell
-.\.venv\Scripts\python.exe main.py --prompt "Viết module Async LRU Cache có TTL và test suite đầy đủ" --backend local
+.\.venv\Scripts\python.exe main.py --prompt "Viết module Async Token Bucket Rate Limiter kèm test suite" --backend local
 ```
 
 #### 🔹 Cách B: Giao việc bài bản bằng file cấu hình Task YAML (`--task`)
@@ -107,21 +126,21 @@ Khởi chạy kèm với workflow pipeline tự chọn:
 ```
 
 #### 🔹 Cách C: Giao việc và can thiệp trực tiếp trong TUI / Web Dashboard
-- **Trên Web Dashboard**: Nhập prompt vào form bên trái, chọn pipeline và nhấn `▶ Khởi chạy Swarm`.
+- **Trên Web Dashboard**: Nhập prompt vào form bên trái, chọn pipeline và nhấn `▶ Khởi chạy Swarm` hoặc chọn tab `🚀 Dự án & AutoPilot`.
 - **Trên TUI**: Gõ vào ô input `⚡ HITL:` ở thanh đáy rồi nhấn `[Enter]`.
 
-### 5. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
+### 6. Khởi chạy Headless Benchmark (CI/CD hoặc Batch Testing)
 ```powershell
 # Chạy benchmark tự động không cần mở giao diện TUI
 .\.venv\Scripts\python.exe main.py --no-tui --workflow tasks/pipelines/dynamic_hitl_pipeline.yaml --backend scenario
 ```
 
-### 6. Phát lại phiên làm việc đã lưu (Replay Mode)
+### 7. Phát lại phiên làm việc đã lưu (Replay Mode)
 ```powershell
 .\.venv\Scripts\python.exe main.py --replay traces/session_20261009_125925.jsonl
 ```
 
-### 7. Chạy toàn bộ bộ kiểm thử tự động (35 Unit Tests & Web Tests)
+### 8. Chạy toàn bộ bộ kiểm thử tự động (42 Unit Tests & Full Stack Tests)
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
@@ -165,9 +184,12 @@ TUIKarma/
 │   ├── test_parallel_workflow.py # Unit tests cho Parallel Fork-Join DAG
 │   ├── test_dynamic_routing_and_hitl.py # Unit tests cho Dynamic Expression Routing & HITL
 │   ├── test_web_server.py      # Unit tests cho Light Fluent 2 Mica Web UI & REST/WS APIs
+│   ├── test_autopilot_and_project.py # Unit tests cho Project Workspace & AutoPilot Engine
 │   ├── test_sandbox_snapshot.py# Unit tests cho Snapshot & phục hồi file trên đĩa
 │   ├── test_workflow_parser.py # Unit tests cho parser YAML pipeline
 │   └── test_hitl_controls.py   # Unit tests cho các lệnh can thiệp HITL
+├── projects/                   # Thư mục lưu trữ các Project Workspaces được quản lý
+├── memory/                     # Cơ sở dữ liệu kinh nghiệm tích lũy (Reflexion Memory)
 └── src/
     └── tuikarma/
         ├── core/
@@ -176,6 +198,10 @@ TUIKarma/
         │   ├── agent.py        # Agent state machine, dynamic model routing & reasoning loop
         │   ├── llm.py          # Universal LLM Gateway (OmniRoute Gateway & Scenario)
         │   └── topology.py     # Hybrid Swarm coordination & Workflow integration
+        ├── project/
+        │   └── manager.py      # Quản lý Project Workspace, scan codebase, browse thư mục
+        ├── memory/
+        │   └── reflexion.py    # Tích lũy tri thức, đúc kết kinh nghiệm & prompt injection
         ├── workflow/
         │   ├── state.py        # WorkflowState & NodeResult (Blackboard pattern)
         │   ├── node.py         # Agent, Decision, Tool, Parallel, và HITL Workflow Nodes
@@ -197,6 +223,8 @@ TUIKarma/
         │   └── snapshot.py     # SandboxSnapshotManager quản lý checkpoint/restore file đĩa
         ├── harness/
         │   ├── task.py         # TaskSpec & Evaluation criteria
+        │   ├── planner.py      # Autonomous Project Planner phân rã 3-5 Milestones
+        │   ├── autopilot.py    # AutoPilot Runner điều phối dự án dài hạn qua các cột mốc
         │   ├── evaluator.py    # Automated task evaluator & scoring engine
         │   └── trajectory.py   # JSONL recorder & replay engine
         └── ui/

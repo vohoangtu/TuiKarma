@@ -1,6 +1,6 @@
 /**
  * TUIKarma Light Fluent 2 Mica Web Dashboard Controller
- * Pure Vanilla JavaScript Client & WebSocket Realtime Event Engine
+ * Microsoft Fluent 2 Mica Material UI & Autonomous AutoPilot Swarm Client
  */
 
 class TUIKarmaWebClient {
@@ -10,12 +10,19 @@ class TUIKarmaWebClient {
     this.currentPipeline = null;
     this.pipelines = [];
     this.currentPendingApproval = null;
+    this.projects = [];
+    this.activeProject = null;
+    this.currentBrowserPathVal = null;
+    this.parentBrowserPathVal = null;
+    this.lessons = [];
 
     this.initElements();
     this.initEventListeners();
     this.initWebSocket();
     this.fetchPipelines();
     this.fetchSandboxFiles();
+    this.fetchProjects();
+    this.fetchLessons();
   }
 
   initElements() {
@@ -27,12 +34,40 @@ class TUIKarmaWebClient {
     this.scoreVal = document.getElementById("score-val");
     this.wsIndicator = document.getElementById("ws-status-indicator");
 
-    // Launch Form
+    // Sidebar mode toggles & panels
+    this.tabModeTask = document.getElementById("tab-mode-task");
+    this.tabModeProject = document.getElementById("tab-mode-project");
+    this.panelTaskRunner = document.getElementById("panel-task-runner");
+    this.panelProjectAutopilot = document.getElementById("panel-project-autopilot");
+
+    // Launch Form (Single Task)
     this.launchForm = document.getElementById("launch-form");
     this.taskPrompt = document.getElementById("task-prompt");
     this.pipelineSelect = document.getElementById("pipeline-select");
     this.backendSelect = document.getElementById("backend-select");
     this.btnLaunch = document.getElementById("btn-launch-task");
+
+    // Project Workspace & AutoPilot
+    this.recentProjectsSelect = document.getElementById("recent-projects-select");
+    this.btnSubNew = document.getElementById("btn-sub-new");
+    this.btnSubOpen = document.getElementById("btn-sub-open");
+    this.newProjectForm = document.getElementById("new-project-form");
+    this.openProjectForm = document.getElementById("open-project-form");
+    this.newProjName = document.getElementById("new-proj-name");
+    this.newProjGoal = document.getElementById("new-proj-goal");
+    this.newProjDir = document.getElementById("new-proj-dir");
+    this.openProjPath = document.getElementById("open-proj-path");
+    this.openProjGoal = document.getElementById("open-proj-goal");
+    this.btnOpenBrowserModal = document.getElementById("btn-open-browser-modal");
+    this.btnScanCodebase = document.getElementById("btn-scan-codebase");
+    this.codebaseSummaryBox = document.getElementById("codebase-summary-box");
+
+    // Milestone Ribbon
+    this.milestoneRibbon = document.getElementById("milestone-ribbon");
+    this.activeProjectTitle = document.getElementById("active-project-title");
+    this.activeProjectPathBadge = document.getElementById("active-project-path-badge");
+    this.milestoneProgressBadge = document.getElementById("milestone-progress-badge");
+    this.milestonesSteps = document.getElementById("milestones-steps");
 
     // DAG Canvas
     this.dagFlow = document.getElementById("dag-flow");
@@ -57,9 +92,130 @@ class TUIKarmaWebClient {
     this.terminalLog = document.getElementById("terminal-log");
     this.sandboxFileList = document.getElementById("sandbox-file-list");
     this.sandboxCodePreview = document.getElementById("sandbox-code-preview");
+    this.lessonsGrid = document.getElementById("lessons-grid");
+    this.btnRefreshLessons = document.getElementById("btn-refresh-lessons");
+
+    // Folder Browser Modal
+    this.folderBrowserModal = document.getElementById("folder-browser-modal");
+    this.currentBrowserPath = document.getElementById("current-browser-path");
+    this.browserFolderList = document.getElementById("browser-folder-list");
+    this.btnFolderUp = document.getElementById("btn-folder-up");
+    this.btnCloseBrowser = document.getElementById("btn-close-browser");
+    this.btnCancelBrowser = document.getElementById("btn-cancel-browser");
+    this.btnSelectFolder = document.getElementById("btn-select-folder");
   }
 
   initEventListeners() {
+    // Mode Switcher: Single Task vs Project AutoPilot
+    if (this.tabModeTask && this.tabModeProject) {
+      this.tabModeTask.addEventListener("click", () => {
+        this.tabModeTask.classList.add("active");
+        this.tabModeProject.classList.remove("active");
+        this.panelTaskRunner.style.display = "block";
+        this.panelProjectAutopilot.style.display = "none";
+      });
+
+      this.tabModeProject.addEventListener("click", () => {
+        this.tabModeProject.classList.add("active");
+        this.tabModeTask.classList.remove("active");
+        this.panelTaskRunner.style.display = "none";
+        this.panelProjectAutopilot.style.display = "block";
+      });
+    }
+
+    // Sub-toggle: New Project vs Open Existing
+    if (this.btnSubNew && this.btnSubOpen) {
+      this.btnSubNew.addEventListener("click", () => {
+        this.btnSubNew.classList.add("active");
+        this.btnSubOpen.classList.remove("active");
+        this.newProjectForm.style.display = "flex";
+        this.openProjectForm.style.display = "none";
+      });
+
+      this.btnSubOpen.addEventListener("click", () => {
+        this.btnSubOpen.classList.add("active");
+        this.btnSubNew.classList.remove("active");
+        this.openProjectForm.style.display = "flex";
+        this.newProjectForm.style.display = "none";
+      });
+    }
+
+    // Recent Projects Selector
+    if (this.recentProjectsSelect) {
+      this.recentProjectsSelect.addEventListener("change", () => {
+        const projId = this.recentProjectsSelect.value;
+        const proj = this.projects.find((p) => p.id === projId);
+        if (proj) {
+          this.activeProject = proj;
+          this.renderMilestonesRibbon(proj);
+          this.openProjPath.value = proj.path;
+          this.openProjGoal.value = proj.goal || "";
+          this.btnSubOpen.click();
+          this.fetchSandboxFiles();
+        }
+      });
+    }
+
+    // New Project Form Submit -> AutoPilot Start
+    if (this.newProjectForm) {
+      this.newProjectForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        this.handleStartNewProjectAutoPilot();
+      });
+    }
+
+    // Open Project Form Submit -> AutoPilot Start
+    if (this.openProjectForm) {
+      this.openProjectForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        this.handleStartOpenProjectAutoPilot();
+      });
+    }
+
+    // Scan Codebase Button
+    if (this.btnScanCodebase) {
+      this.btnScanCodebase.addEventListener("click", () => this.handleScanCodebase());
+    }
+
+    // Folder Browser Modal Actions
+    if (this.btnOpenBrowserModal) {
+      this.btnOpenBrowserModal.addEventListener("click", () => {
+        const initialPath = this.openProjPath.value.trim() || null;
+        this.openFolderBrowser(initialPath);
+      });
+    }
+    if (this.btnCloseBrowser) {
+      this.btnCloseBrowser.addEventListener("click", () => {
+        this.folderBrowserModal.style.display = "none";
+      });
+    }
+    if (this.btnCancelBrowser) {
+      this.btnCancelBrowser.addEventListener("click", () => {
+        this.folderBrowserModal.style.display = "none";
+      });
+    }
+    if (this.btnFolderUp) {
+      this.btnFolderUp.addEventListener("click", () => {
+        if (this.parentBrowserPathVal) {
+          this.openFolderBrowser(this.parentBrowserPathVal);
+        }
+      });
+    }
+    if (this.btnSelectFolder) {
+      this.btnSelectFolder.addEventListener("click", () => {
+        if (this.currentBrowserPathVal) {
+          this.openProjPath.value = this.currentBrowserPathVal;
+          this.folderBrowserModal.style.display = "none";
+          this.handleScanCodebase();
+        }
+      });
+    }
+
+    // Refresh Lessons Button
+    if (this.btnRefreshLessons) {
+      this.btnRefreshLessons.addEventListener("click", () => this.fetchLessons());
+    }
+
     // Preset task buttons
     document.querySelectorAll(".preset-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -76,7 +232,7 @@ class TUIKarmaWebClient {
       this.renderPipelinePreview(this.pipelineSelect.value);
     });
 
-    // Form submission
+    // Single Task Form submission
     this.launchForm.addEventListener("submit", (e) => {
       e.preventDefault();
       this.handleLaunch();
@@ -101,7 +257,6 @@ class TUIKarmaWebClient {
 
     // Global keyboard shortcuts for HITL
     document.addEventListener("keydown", (e) => {
-      // Ignore if typing in text inputs
       if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
       const key = e.key.toUpperCase();
       if (key === "P") this.togglePause();
@@ -123,6 +278,7 @@ class TUIKarmaWebClient {
         const targetEl = document.getElementById(targetId);
         if (targetEl) targetEl.classList.add("active");
         if (targetId === "tab-sandbox") this.fetchSandboxFiles();
+        if (targetId === "tab-memory") this.fetchLessons();
       });
     });
   }
@@ -139,7 +295,7 @@ class TUIKarmaWebClient {
 
     this.ws.onclose = () => {
       this.wsIndicator.style.background = "#c42b1c";
-      setTimeout(() => this.initWebSocket(), 2000); // Auto reconnect
+      setTimeout(() => this.initWebSocket(), 2500); // Auto reconnect
     };
 
     this.ws.onmessage = (event) => {
@@ -162,6 +318,8 @@ class TUIKarmaWebClient {
       this.btnLaunch.disabled = false;
       this.activeStepInfo.textContent = "Hoàn tất luồng công việc.";
       this.fetchSandboxFiles();
+      this.fetchProjects();
+      this.fetchLessons();
     }
   }
 
@@ -231,6 +389,10 @@ class TUIKarmaWebClient {
     if (data.score !== null && data.score !== undefined) {
       this.scorePill.style.display = "flex";
       this.scoreVal.textContent = `${(data.score * 100).toFixed(1)}% (${data.passed ? "PASS" : "FAIL"})`;
+    }
+    if (data.active_project) {
+      this.activeProject = data.active_project;
+      this.renderMilestonesRibbon(data.active_project);
     }
   }
 
@@ -317,14 +479,14 @@ class TUIKarmaWebClient {
     const roleKey = (agentName || "").toLowerCase();
     const cot = document.getElementById(`cot-${roleKey}`);
     if (cot) {
-      cot.textContent = content.substring(0, 100) + "...";
+      cot.textContent = content.substring(0, 110) + "...";
     }
   }
 
   appendDialogue(sender, receiver, text) {
     const item = document.createElement("div");
     item.className = "dialogue-item";
-    const avatar = sender.includes("Supervisor") ? "👑" : sender.includes("Coder") ? "💻" : sender.includes("Tester") ? "🧪" : sender.includes("Critic") ? "🔍" : "👤";
+    const avatar = sender.includes("Supervisor") ? "👑" : sender.includes("Coder") ? "💻" : sender.includes("Tester") ? "🧪" : sender.includes("Critic") ? "🔍" : sender.includes("AutoPilot") ? "🧭" : "👤";
     item.innerHTML = `
       <div class="dialogue-avatar">${avatar}</div>
       <div class="dialogue-bubble">
@@ -350,7 +512,7 @@ class TUIKarmaWebClient {
       const files = await res.json();
       this.sandboxFileList.innerHTML = "";
       if (files.length === 0) {
-        this.sandboxFileList.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-tertiary); padding: 6px;">Chưa có file nào sinh ra.</div>`;
+        this.sandboxFileList.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-tertiary); padding: 6px;">Chưa có file nào trong không gian làm việc.</div>`;
         return;
       }
       files.forEach((f) => {
@@ -376,6 +538,238 @@ class TUIKarmaWebClient {
       this.sandboxCodePreview.textContent = data.content || "(Tệp rỗng)";
     } catch (err) {
       this.sandboxCodePreview.textContent = `Lỗi đọc file: ${err}`;
+    }
+  }
+
+  /* ========================================================================
+     Project Workspace & AutoPilot Engine Handlers
+     ======================================================================== */
+
+  async fetchProjects() {
+    try {
+      const res = await fetch("/api/projects");
+      this.projects = await res.json();
+      if (this.recentProjectsSelect) {
+        this.recentProjectsSelect.innerHTML = `<option value="">-- Chọn dự án để tiếp tục --</option>`;
+        this.projects.forEach((p) => {
+          const opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = `${p.name} (${p.status}) - ${p.milestones ? p.milestones.length : 0} cột mốc`;
+          this.recentProjectsSelect.appendChild(opt);
+        });
+      }
+    } catch (err) {
+      console.error("Fetch projects error:", err);
+    }
+  }
+
+  renderMilestonesRibbon(project) {
+    if (!project || !this.milestoneRibbon) return;
+    this.milestoneRibbon.style.display = "block";
+    this.activeProjectTitle.textContent = `Dự án: ${project.name}`;
+    this.activeProjectPathBadge.textContent = project.path;
+
+    const milestones = project.milestones || [];
+    const completed = milestones.filter((m) => m.status === "COMPLETED").length;
+    this.milestoneProgressBadge.textContent = `${completed}/${milestones.length} Milestones`;
+
+    this.milestonesSteps.innerHTML = "";
+    if (milestones.length === 0) {
+      this.milestonesSteps.innerHTML = `<div style="font-size: 0.78rem; color: var(--text-tertiary); padding: 6px;">Đang chuẩn bị phân rã cột mốc...</div>`;
+      return;
+    }
+
+    milestones.forEach((m) => {
+      const card = document.createElement("div");
+      card.className = `milestone-card ${m.status || "PENDING"}`;
+      const statusIcon = m.status === "COMPLETED" ? "✔" : m.status === "IN_PROGRESS" ? "▶" : m.status === "FAILED" ? "✖" : "○";
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="milestone-id-badge">${m.id}</span>
+          <span style="font-size: 0.72rem; font-weight: 600;">${statusIcon} ${m.status}</span>
+        </div>
+        <div class="milestone-title">${this.escapeHTML(m.title)}</div>
+        <div class="milestone-goal" title="${this.escapeHTML(m.goal)}">${this.escapeHTML(m.goal)}</div>
+      `;
+      this.milestonesSteps.appendChild(card);
+    });
+  }
+
+  async handleStartNewProjectAutoPilot() {
+    const name = this.newProjName.value.trim();
+    const goal = this.newProjGoal.value.trim();
+    const targetDir = this.newProjDir.value.trim() || null;
+    if (!name || !goal) return;
+
+    this.statusVal.textContent = "PLANNING";
+    this.appendTerminalLine("cmd", `[AUTOPILOT] Khởi tạo dự án mới '${name}' với mục tiêu: ${goal}`);
+
+    try {
+      const res = await fetch("/api/autopilot/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          goal: goal,
+          target_dir: targetDir,
+          backend: this.backendSelect ? this.backendSelect.value : "auto",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Không thể bắt đầu AutoPilot: ${err.detail || "Lỗi máy chủ"}`);
+        return;
+      }
+      const data = await res.json();
+      this.appendTerminalLine("res", `[AUTOPILOT] Đã kích hoạt AutoPilot cho ID: ${data.project_id}`);
+      this.fetchProjects();
+    } catch (err) {
+      alert(`Lỗi kết nối AutoPilot: ${err}`);
+    }
+  }
+
+  async handleStartOpenProjectAutoPilot() {
+    const folderPath = this.openProjPath.value.trim();
+    const goal = this.openProjGoal.value.trim();
+    if (!folderPath) {
+      alert("Vui lòng nhập hoặc chọn đường dẫn thư mục dự án.");
+      return;
+    }
+
+    this.statusVal.textContent = "PLANNING";
+    this.appendTerminalLine("cmd", `[AUTOPILOT] Mở dự án tại '${folderPath}', nạp mục tiêu: ${goal}`);
+
+    try {
+      const res = await fetch("/api/autopilot/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_path: folderPath,
+          goal: goal || "Phát triển và bảo trì codebase",
+          backend: this.backendSelect ? this.backendSelect.value : "auto",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Không thể bắt đầu AutoPilot: ${err.detail || "Lỗi máy chủ"}`);
+        return;
+      }
+      const data = await res.json();
+      this.appendTerminalLine("res", `[AUTOPILOT] Đã kích hoạt AutoPilot trên codebase: ${data.project_path}`);
+      this.fetchProjects();
+    } catch (err) {
+      alert(`Lỗi kết nối AutoPilot: ${err}`);
+    }
+  }
+
+  async handleScanCodebase() {
+    const folderPath = this.openProjPath.value.trim();
+    if (!folderPath) {
+      alert("Vui lòng chọn thư mục cần quét.");
+      return;
+    }
+
+    this.btnScanCodebase.disabled = true;
+    this.btnScanCodebase.textContent = "⌛ Đang phân tích Codebase...";
+
+    try {
+      const res = await fetch("/api/projects/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder_path: folderPath, goal: this.openProjGoal.value.trim() }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Lỗi khảo sát: ${err.detail}`);
+        this.btnScanCodebase.disabled = false;
+        this.btnScanCodebase.textContent = "🔍 Quét & Khảo sát Codebase";
+        return;
+      }
+
+      const data = await res.json();
+      const cb = data.codebase;
+      this.codebaseSummaryBox.style.display = "block";
+      this.codebaseSummaryBox.innerHTML = `
+        <div style="font-weight: 600; color: var(--accent-primary); margin-bottom: 4px;">📊 Kết quả khảo sát Codebase:</div>
+        <div>• <strong>Tổng số tệp:</strong> ${cb.total_files} files</div>
+        <div>• <strong>File cấu hình chính:</strong> ${cb.key_configs.length > 0 ? cb.key_configs.join(", ") : "Chưa có"}</div>
+        <div>• <strong>Ngôn ngữ/Đuôi mở rộng:</strong> ${Object.entries(cb.file_types || {}).map(([k, v]) => `${k} (${v})`).join(", ")}</div>
+      `;
+      this.appendTerminalLine("res", `[SCAN CODEBASE] Tìm thấy ${cb.total_files} files trong thư mục '${cb.project_name}'.`);
+      this.fetchSandboxFiles();
+    } catch (err) {
+      alert(`Lỗi scan: ${err}`);
+    } finally {
+      this.btnScanCodebase.disabled = false;
+      this.btnScanCodebase.textContent = "🔍 Quét & Khảo sát Codebase";
+    }
+  }
+
+  async openFolderBrowser(path = null) {
+    this.folderBrowserModal.style.display = "flex";
+    this.currentBrowserPath.textContent = "Đang tải thư mục...";
+    this.browserFolderList.innerHTML = `<div style="font-size: 0.8rem; padding: 10px; color: var(--text-tertiary);">Đang tải...</div>`;
+
+    try {
+      const url = path ? `/api/fs/browse?path=${encodeURIComponent(path)}` : "/api/fs/browse";
+      const res = await fetch(url);
+      const data = await res.json();
+
+      this.currentBrowserPathVal = data.current_path;
+      this.parentBrowserPathVal = data.parent_path;
+      this.currentBrowserPath.textContent = data.current_path;
+      this.btnFolderUp.disabled = !data.parent_path;
+
+      this.browserFolderList.innerHTML = "";
+      if (data.folders.length === 0) {
+        this.browserFolderList.innerHTML = `<div style="font-size: 0.8rem; padding: 10px; color: var(--text-tertiary);">Không có thư mục con nào.</div>`;
+        return;
+      }
+
+      data.folders.forEach((folder) => {
+        const item = document.createElement("div");
+        item.className = "folder-entry";
+        item.innerHTML = `<span>📁</span> <span>${this.escapeHTML(folder.name)}</span>`;
+        item.addEventListener("click", () => {
+          this.openFolderBrowser(folder.path);
+        });
+        this.browserFolderList.appendChild(item);
+      });
+    } catch (err) {
+      this.browserFolderList.innerHTML = `<div style="color: var(--status-danger); padding: 10px;">Lỗi duyệt thư mục: ${err}</div>`;
+    }
+  }
+
+  async fetchLessons() {
+    try {
+      const res = await fetch("/api/memory/lessons");
+      this.lessons = await res.json();
+      if (!this.lessonsGrid) return;
+      this.lessonsGrid.innerHTML = "";
+      if (this.lessons.length === 0) {
+        this.lessonsGrid.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-tertiary); padding: 10px;">Chưa có bài học nào được ghi lại.</div>`;
+        return;
+      }
+      this.lessons.forEach((l) => {
+        const card = document.createElement("div");
+        card.className = "lesson-card";
+        card.innerHTML = `
+          <div class="lesson-header">
+            <span class="lesson-domain-badge">${l.domain}</span>
+            <span style="font-size: 0.7rem; color: var(--text-tertiary);">${l.id} • Đã áp dụng ${l.applied_count || 0} lần</span>
+          </div>
+          <div class="lesson-trigger">⚠ Tình huống: ${this.escapeHTML(l.trigger_error)}</div>
+          <div class="lesson-cause"><strong>Nguyên nhân:</strong> ${this.escapeHTML(l.root_cause)}</div>
+          <div class="lesson-learned">✔ <strong>Bài học rút ra:</strong> ${this.escapeHTML(l.lesson_learned)}</div>
+          ${l.recommended_pattern ? `<div class="lesson-pattern">Khuyến nghị áp dụng:\n${this.escapeHTML(l.recommended_pattern)}</div>` : ""}
+        `;
+        this.lessonsGrid.appendChild(card);
+      });
+    } catch (err) {
+      console.error("Fetch lessons error:", err);
     }
   }
 

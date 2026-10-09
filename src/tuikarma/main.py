@@ -70,12 +70,51 @@ def main() -> None:
     parser.add_argument("--web", action="store_true", help="Khởi chạy Light Fluent 2 Mica Web UI Dashboard")
     parser.add_argument("--port", type=int, default=8080, help="Cổng chạy Web UI (mặc định: 8080)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host chạy Web UI (mặc định: 127.0.0.1)")
+    parser.add_argument("--autopilot", type=str, default=None, help="Mục tiêu dự án chạy tự hành đa cột mốc (AutoPilot)")
+    parser.add_argument("--project-dir", type=str, default=None, help="Đường dẫn thư mục dự án cục bộ mở có sẵn")
+    parser.add_argument("--project-name", type=str, default=None, help="Tên dự án mới tạo")
     args = parser.parse_args()
 
     if args.web:
         from tuikarma.web.server import run_web_server
         run_web_server(host=args.host, port=args.port)
         return
+
+    if args.autopilot:
+        from tuikarma.project.manager import ProjectManager
+        from tuikarma.harness.autopilot import AutoPilotRunner
+        from tuikarma.core.events import MessageEvent
+
+        pm = ProjectManager()
+        if args.project_dir:
+            proj = pm.open_existing_project(args.project_dir, goal=args.autopilot)
+        else:
+            p_name = args.project_name or "Autonomous Project"
+            proj = pm.create_new_project(p_name, goal=args.autopilot)
+
+        llm = get_default_llm_provider(force_backend=args.backend)
+        bus = EventBus()
+
+        async def _log_event(e: MessageEvent):
+            print(f"[{e.sender} ➔ {e.receiver}]: {e.content}")
+
+        bus.subscribe(MessageEvent, _log_event)
+
+        print("\n" + "=" * 65)
+        print(f"🚀 [TUIKarma AUTOPILOT] Bắt đầu tự hành cho dự án: '{proj.name}'")
+        print(f"🎯 Mục tiêu: {proj.goal}")
+        print(f"📁 Thư mục mã nguồn: {proj.path}")
+        print("=" * 65)
+
+        runner = AutoPilotRunner(project=proj, llm=llm, bus=bus, project_manager=pm)
+        res = asyncio.run(runner.run())
+
+        print("\n" + "=" * 65)
+        print(f"🏁 [AUTOPILOT KẾT THÚC] Trạng thái: {res['status']}")
+        print(f"📊 Cột mốc hoàn thành: {res['completed_milestones']}/{res['total_milestones']}")
+        print(f"💾 Mã nguồn lưu tại: {res['project_path']}")
+        print("=" * 65)
+        sys.exit(0 if res['status'] == 'COMPLETED' else 1)
 
     if args.prompt:
         task = TaskSpec(

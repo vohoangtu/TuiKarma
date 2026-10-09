@@ -43,6 +43,9 @@ from tuikarma.harness.evaluator import TaskEvaluator
 from tuikarma.harness.trajectory import TrajectoryRecorder
 from tuikarma.workflow.parser import WorkflowParser
 from tuikarma.workflow.state import WorkflowState
+from tuikarma.project.manager import ProjectManager, ProjectMetadata
+from tuikarma.memory.reflexion import ExperienceStore
+from tuikarma.harness.autopilot import AutoPilotRunner
 
 logger = logging.getLogger("tuikarma.web")
 
@@ -62,6 +65,26 @@ class HITLCommandRequest(BaseModel):
     payload: Optional[str] = None
 
 
+class CreateProjectRequest(BaseModel):
+    name: str
+    goal: str
+    target_dir: Optional[str] = None
+
+
+class OpenProjectRequest(BaseModel):
+    folder_path: str
+    goal: Optional[str] = None
+
+
+class AutoPilotRequest(BaseModel):
+    project_id: Optional[str] = None
+    name: Optional[str] = None
+    goal: str
+    project_path: Optional[str] = None
+    backend: str = "auto"
+
+
+
 class WebSessionManager:
     """Manages active Swarm execution, EventBus subscriptions, and WebSocket clients."""
 
@@ -70,6 +93,9 @@ class WebSessionManager:
         self.topology = SwarmTopology(self.bus, llm=get_default_llm_provider("auto"))
         self.evaluator = TaskEvaluator(self.topology.workspace_dir, bus=self.bus)
         self.recorder: Optional[TrajectoryRecorder] = None
+        self.project_manager = ProjectManager()
+        self.memory_store = ExperienceStore()
+        self.active_project: Optional[ProjectMetadata] = None
         self.active_task_coro: Optional[asyncio.Task] = None
         self.is_running = False
         self.last_status: Dict[str, Any] = {
@@ -201,6 +227,77 @@ class WebSessionManager:
         self.active_task_coro = asyncio.create_task(_run())
         return {"status": "STARTED", "task_id": task.id, "title": task.title}
 
+    async def start_autopilot(self, req: AutoPilotRequest) -> Dict[str, Any]:
+        if self.is_running and self.active_task_coro and not self.active_task_coro.done():
+            raise HTTPException(status_code=400, detail="Một tác vụ hoặc phiên AutoPilot đang tích cực hoạt động.")
+
+        # Re-initialize EventBus & broadcast
+        self.bus = EventBus()
+        self.bus.subscribe(BaseEvent, self._on_any_event)
+        llm = get_default_llm_provider(req.backend)
+
+        # Resolve or create project
+        if req.project_id:
+            project = self.project_manager.get_project(req.project_id)
+            if not project:
+                raise HTTPException(status_code=404, detail="Không tìm thấy project_id trong registry.")
+            if req.goal:
+                project.goal = req.goal
+        elif req.project_path:
+            project = self.project_manager.open_existing_project(req.project_path, goal=req.goal or "")
+        else:
+            p_name = req.name or "Dự án Tự hành AutoPilot"
+            project = self.project_manager.create_new_project(p_name, goal=req.goal)
+
+        self.active_project = project
+        self.topology = SwarmTopology(self.bus, workspace_dir=Path(project.path), llm=llm)
+        self.evaluator = TaskEvaluator(self.topology.workspace_dir, bus=self.bus)
+        self.recorder = TrajectoryRecorder(self.bus)
+
+        self.last_status = {
+            "status": "RUNNING",
+            "mode": "AUTOPILOT",
+            "current_node": "PLANNER",
+            "active_project": project.model_dump(),
+            "active_milestones": project.milestones,
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "cost_usd": 0.0,
+            "score": None,
+            "passed": None,
+            "pending_approval": None,
+        }
+
+        runner = AutoPilotRunner(
+            project=project,
+            llm=llm,
+            bus=self.bus,
+            memory_store=self.memory_store,
+            project_manager=self.project_manager
+        )
+
+        async def _run():
+            self.is_running = True
+            try:
+                res = await runner.run()
+                self.last_status["status"] = res["status"]
+                self.last_status["active_project"] = project.model_dump()
+                self.last_status["active_milestones"] = project.milestones
+            except Exception as e:
+                logger.error(f"AutoPilot execution failed: {e}", exc_info=True)
+                self.last_status["status"] = "FAILED"
+            finally:
+                self.is_running = False
+                await self.broadcast_event({"type": "TASK_FINISHED", "data": self.last_status})
+
+        self.active_task_coro = asyncio.create_task(_run())
+        return {
+            "status": "STARTED",
+            "project_id": project.id,
+            "project_name": project.name,
+            "project_path": project.path,
+        }
+
     async def handle_hitl_command(self, action_str: str, payload: Optional[str] = None) -> Dict[str, Any]:
         action_upper = action_str.upper()
         wf = self.topology.active_workflow
@@ -252,6 +349,8 @@ async def get_status():
         **manager.last_status,
         "is_running": manager.is_running,
         "is_paused": getattr(manager.topology, "is_paused", False),
+        "active_project": manager.active_project.model_dump() if manager.active_project else None,
+        "experience_lessons_count": len(manager.memory_store.lessons),
         "agents": {
             k: {
                 "role": v.role,
@@ -261,6 +360,44 @@ async def get_status():
             for k, v in manager.topology.agents.items()
         }
     }
+
+
+@app.get("/api/projects")
+async def list_projects():
+    return [p.model_dump() for p in manager.project_manager.list_projects()]
+
+
+@app.post("/api/projects/new")
+async def create_new_project(req: CreateProjectRequest):
+    proj = manager.project_manager.create_new_project(req.name, req.goal, req.target_dir)
+    manager.active_project = proj
+    return proj.model_dump()
+
+
+@app.post("/api/projects/open")
+async def open_existing_project(req: OpenProjectRequest):
+    try:
+        proj = manager.project_manager.open_existing_project(req.folder_path, req.goal or "")
+        manager.active_project = proj
+        codebase = manager.project_manager.scan_project_codebase(proj.path)
+        return {"project": proj.model_dump(), "codebase": codebase}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/fs/browse")
+async def browse_folders(path: Optional[str] = None):
+    return ProjectManager.browse_local_directories(path)
+
+
+@app.get("/api/memory/lessons")
+async def list_memory_lessons():
+    return [l.model_dump() for l in manager.memory_store.lessons]
+
+
+@app.post("/api/autopilot/start")
+async def start_autopilot(req: AutoPilotRequest):
+    return await manager.start_autopilot(req)
 
 
 @app.get("/api/pipelines")
@@ -294,10 +431,16 @@ async def get_pipelines():
 
 @app.get("/api/sandbox/files")
 async def get_sandbox_files():
-    sb_dir = manager.topology.workspace_dir
+    if manager.active_project and Path(manager.active_project.path).exists():
+        sb_dir = Path(manager.active_project.path)
+    else:
+        sb_dir = manager.topology.workspace_dir
     files = []
     if sb_dir.exists():
+        ignore = {".git", ".venv", "venv", "__pycache__", ".tuikarma", ".pytest_cache"}
         for f in sb_dir.rglob("*"):
+            if any(part in ignore for part in f.parts):
+                continue
             if f.is_file():
                 rel_path = f.relative_to(sb_dir).as_posix()
                 files.append({
@@ -311,7 +454,10 @@ async def get_sandbox_files():
 
 @app.get("/api/sandbox/file")
 async def get_sandbox_file_content(path: str = Query(...)):
-    sb_dir = manager.topology.workspace_dir
+    if manager.active_project and Path(manager.active_project.path).exists():
+        sb_dir = Path(manager.active_project.path)
+    else:
+        sb_dir = manager.topology.workspace_dir
     target = (sb_dir / path).resolve()
     if not str(target).startswith(str(sb_dir.resolve())):
         raise HTTPException(status_code=403, detail="Access denied")
