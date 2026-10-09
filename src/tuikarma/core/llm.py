@@ -139,6 +139,7 @@ class LocalGatewayLLMProvider(BaseLLMProvider):
             usage = res_data.get("usage", {})
             tokens_in = usage.get("prompt_tokens", 0)
             tokens_out = usage.get("completion_tokens", 0)
+            cost_usd = self._estimate_cost(model_name, tokens_in, tokens_out)
 
             return LLMResponse(
                 content=content or "Đã thực hiện xong.",
@@ -146,7 +147,7 @@ class LocalGatewayLLMProvider(BaseLLMProvider):
                 tool_calls=parsed_tools,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
-                cost_usd=0.0  # Local gateway = 0 direct cost
+                cost_usd=cost_usd
             )
 
         except Exception as e:
@@ -158,6 +159,19 @@ class LocalGatewayLLMProvider(BaseLLMProvider):
                 tokens_out=0,
                 cost_usd=0.0
             )
+
+    @staticmethod
+    def _estimate_cost(model_name: str, tokens_in: int, tokens_out: int) -> float:
+        rate_in = 0.000003
+        rate_out = 0.000015
+        m_lower = model_name.lower()
+        if "opus" in m_lower:
+            rate_in = 0.000015
+            rate_out = 0.000075
+        elif "flash" in m_lower or "gemini" in m_lower:
+            rate_in = 0.00000015
+            rate_out = 0.0000006
+        return (tokens_in * rate_in) + (tokens_out * rate_out)
 
 
 class ScenarioLLMProvider(BaseLLMProvider):

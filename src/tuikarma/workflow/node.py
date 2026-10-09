@@ -86,10 +86,11 @@ class AgentWorkflowNode(BaseWorkflowNode):
                 **state.node_outputs,
                 **state.shared_data,
             }
-            try:
-                prompt = self.prompt_template.format(**context_dict)
-            except KeyError:
-                prompt = self.prompt_template
+            prompt = self.prompt_template
+            for k, v in context_dict.items():
+                placeholder = f"{{{k}}}"
+                if placeholder in prompt:
+                    prompt = prompt.replace(placeholder, str(v))
         else:
             prompt = f"Thực hiện bước {self.name} cho nhiệm vụ: {state.task_description}"
 
