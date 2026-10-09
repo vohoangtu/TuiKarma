@@ -405,9 +405,11 @@ async def start_autopilot(req: AutoPilotRequest):
     return await manager.start_autopilot(req)
 
 
-def _get_active_graph_engine():
+def _get_active_graph_engine(custom_path: Optional[str] = None):
     from tuikarma.graph.engine import CodeKnowledgeGraphEngine
-    if manager.active_project and Path(manager.active_project.path).exists():
+    if custom_path and Path(custom_path).exists() and Path(custom_path).is_dir():
+        target = Path(custom_path)
+    elif manager.active_project and Path(manager.active_project.path).exists():
         target = Path(manager.active_project.path)
     else:
         target = manager.topology.workspace_dir
@@ -415,32 +417,32 @@ def _get_active_graph_engine():
 
 
 @app.get("/api/graph/summary")
-async def get_graph_summary():
-    engine = _get_active_graph_engine()
+async def get_graph_summary(path: Optional[str] = Query(None)):
+    engine = _get_active_graph_engine(path)
     return engine.get_summary()
 
 
 @app.get("/api/graph/query")
-async def query_graph_symbol(symbol: str = Query(...)):
-    engine = _get_active_graph_engine()
+async def query_graph_symbol(symbol: str = Query(...), path: Optional[str] = Query(None)):
+    engine = _get_active_graph_engine(path)
     return engine.query_symbol(symbol)
 
 
 @app.get("/api/graph/path")
-async def find_graph_path(source: str = Query(...), target: str = Query(...)):
-    engine = _get_active_graph_engine()
+async def find_graph_path(source: str = Query(...), target: str = Query(...), path: Optional[str] = Query(None)):
+    engine = _get_active_graph_engine(path)
     return engine.find_path(source, target)
 
 
 @app.get("/api/graph/impact")
-async def analyze_graph_impact(symbol: str = Query(...), depth: int = Query(2)):
-    engine = _get_active_graph_engine()
+async def analyze_graph_impact(symbol: str = Query(...), depth: int = Query(2), path: Optional[str] = Query(None)):
+    engine = _get_active_graph_engine(path)
     return engine.impact_analysis(symbol, max_depth=depth)
 
 
 @app.get("/api/graph/view")
-async def view_graph_html():
-    engine = _get_active_graph_engine()
+async def view_graph_html(path: Optional[str] = Query(None)):
+    engine = _get_active_graph_engine(path)
     html_path = engine.export_interactive_html()
     if html_path and html_path.exists():
         return FileResponse(html_path, media_type="text/html")

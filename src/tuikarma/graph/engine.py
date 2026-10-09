@@ -23,6 +23,9 @@ except ImportError:
     logger.warning("graphify package is not installed. Code Knowledge Graph will operate in fallback mode.")
 
 
+_MEMORY_GRAPH_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
 class CodeKnowledgeGraphEngine:
     """Manages Code Knowledge Graph generation, queries, and architectural analytics."""
 
@@ -37,8 +40,31 @@ class CodeKnowledgeGraphEngine:
 
     def build(self, force_rebuild: bool = False) -> nx.Graph:
         """Constructs or retrieves the cached Code Knowledge Graph."""
-        if self.graph is not None and not force_rebuild:
-            return self.graph
+        cache_key = str(self.root_dir)
+        disk_cache_file = self.root_dir / ".tuikarma" / "graph_cache.pkl"
+
+        if not force_rebuild:
+            if self.graph is not None:
+                return self.graph
+            if cache_key in _MEMORY_GRAPH_CACHE:
+                cached = _MEMORY_GRAPH_CACHE[cache_key]
+                self.graph = cached["graph"]
+                self.communities = cached["communities"]
+                self._raw_extractions = cached.get("raw")
+                return self.graph
+            if disk_cache_file.exists():
+                try:
+                    import pickle
+                    with open(disk_cache_file, "rb") as f:
+                        cached = pickle.load(f)
+                    self.graph = cached["graph"]
+                    self.communities = cached.get("communities", {})
+                    self._raw_extractions = cached.get("raw")
+                    _MEMORY_GRAPH_CACHE[cache_key] = cached
+                    logger.info(f"Loaded Code Knowledge Graph from disk cache for {self.root_dir}")
+                    return self.graph
+                except Exception as e:
+                    logger.debug(f"Failed to read disk graph cache: {e}")
 
         if not GRAPHIFY_AVAILABLE:
             self.graph = nx.Graph()
@@ -56,7 +82,9 @@ class CodeKnowledgeGraphEngine:
 
             raw = extract(files, parallel=False)
             self._raw_extractions = raw
-            G = build([raw])
+            # For repos with over 800 files, dedup=False avoids heavy O(N^2) Jaro-Winkler stall
+            should_dedup = len(files) <= 800
+            G = build([raw], dedup=should_dedup)
             self.graph = G
 
             try:
@@ -64,6 +92,23 @@ class CodeKnowledgeGraphEngine:
             except Exception as e:
                 logger.debug(f"Clustering warning: {e}")
                 self.communities = {}
+
+            # Cache in memory
+            cache_payload = {
+                "graph": G,
+                "communities": self.communities,
+                "raw": self._raw_extractions,
+            }
+            _MEMORY_GRAPH_CACHE[cache_key] = cache_payload
+
+            # Persist to disk cache
+            try:
+                disk_cache_file.parent.mkdir(parents=True, exist_ok=True)
+                import pickle
+                with open(disk_cache_file, "wb") as f:
+                    pickle.dump(cache_payload, f)
+            except Exception as e:
+                logger.debug(f"Failed to persist graph cache to disk: {e}")
 
             logger.info(f"Built Code Knowledge Graph for {self.root_dir}: {len(G.nodes)} nodes, {len(G.edges)} edges")
             return self.graph
@@ -274,7 +319,8 @@ class CodeKnowledgeGraphEngine:
 
         out_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            success = to_html(G, self.communities, str(out_file))
+            node_limit = 500 if len(G.nodes) > 500 else None
+            success = to_html(G, self.communities, str(out_file), node_limit=node_limit)
             if success and out_file.exists():
                 return out_file
         except Exception as e:

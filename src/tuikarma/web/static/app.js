@@ -106,6 +106,7 @@ class TUIKarmaWebClient {
     this.graphQueryResult = document.getElementById("graph-query-result");
     this.graphGodNodesList = document.getElementById("graph-god-nodes-list");
     this.btnRefreshGraph = document.getElementById("btn-refresh-graph");
+    this.btnOpenGraphVisualizer = document.getElementById("btn-open-graph-visualizer");
 
     // Folder Browser Modal
     this.folderBrowserModal = document.getElementById("folder-browser-modal");
@@ -885,9 +886,19 @@ class TUIKarmaWebClient {
      Graphify Code Knowledge Graph Handlers
      ======================================================================== */
 
+  getCurrentProjectPath() {
+    return (this.openProjPath && this.openProjPath.value.trim()) || "";
+  }
+
   async fetchGraphSummary() {
+    if (this.graphNodesCount && this.graphNodesCount.textContent === "0") {
+      this.graphNodesCount.textContent = "⏳...";
+      this.graphEdgesCount.textContent = "⏳...";
+    }
     try {
-      const res = await fetch("/api/graph/summary");
+      const curPath = this.getCurrentProjectPath();
+      const url = curPath ? `/api/graph/summary?path=${encodeURIComponent(curPath)}` : "/api/graph/summary";
+      const res = await fetch(url);
       const data = await res.json();
       if (!data.available) {
         if (this.graphQueryResult) {
@@ -895,6 +906,10 @@ class TUIKarmaWebClient {
           this.graphQueryResult.textContent = "Graphify chưa sẵn sàng hoặc không tìm thấy mã nguồn.";
         }
         return;
+      }
+
+      if (this.btnOpenGraphVisualizer) {
+        this.btnOpenGraphVisualizer.href = curPath ? `/api/graph/view?path=${encodeURIComponent(curPath)}` : "/api/graph/view";
       }
 
       if (this.graphNodesCount) this.graphNodesCount.textContent = data.total_nodes.toLocaleString();
@@ -945,7 +960,9 @@ class TUIKarmaWebClient {
     }
 
     try {
-      const res = await fetch(`/api/graph/query?symbol=${encodeURIComponent(symbol)}`);
+      const curPath = this.getCurrentProjectPath();
+      const url = `/api/graph/query?symbol=${encodeURIComponent(symbol)}${curPath ? `&path=${encodeURIComponent(curPath)}` : ""}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (!data.found) {
         this.graphQueryResult.textContent = `❌ ${data.message || "Không tìm thấy symbol trong đồ thị."}`;
@@ -979,7 +996,9 @@ class TUIKarmaWebClient {
     }
 
     try {
-      const res = await fetch(`/api/graph/impact?symbol=${encodeURIComponent(symbol)}&depth=2`);
+      const curPath = this.getCurrentProjectPath();
+      const url = `/api/graph/impact?symbol=${encodeURIComponent(symbol)}&depth=2${curPath ? `&path=${encodeURIComponent(curPath)}` : ""}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (!data.found) {
         this.graphQueryResult.textContent = `❌ ${data.message || "Không tìm thấy symbol."}`;

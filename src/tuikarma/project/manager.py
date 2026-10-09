@@ -158,18 +158,18 @@ class ProjectManager:
         if not base.exists() or not base.is_dir():
             return {"error": "Invalid directory", "files": [], "total_files": 0}
 
-        ignore_dirs = {".git", ".venv", "venv", "__pycache__", "node_modules", ".pytest_cache", ".idea", ".vscode", "dist", "build"}
+        ignore_dirs = {".git", ".venv", "venv", "__pycache__", "node_modules", ".pytest_cache", ".idea", ".vscode", "dist", "build", "vendor", ".next", ".nuxt"}
         collected_files = []
         key_configs = []
 
-        for p in base.rglob("*"):
-            # Check ignore
-            if any(part in ignore_dirs for part in p.parts):
-                continue
-            if p.is_file():
+        import os
+        for root, dirs, files in os.walk(base):
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+            for f in files:
+                p = Path(root) / f
                 rel = p.relative_to(base).as_posix()
                 collected_files.append(rel)
-                if p.name.lower() in ("pyproject.toml", "requirements.txt", "package.json", "dockerfile", "readme.md", "setup.py", "go.mod", "cargo.toml"):
+                if f.lower() in ("pyproject.toml", "requirements.txt", "package.json", "dockerfile", "readme.md", "setup.py", "go.mod", "cargo.toml"):
                     key_configs.append(rel)
 
         # Detect primary languages
