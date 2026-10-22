@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "PROJ-1791608840-api_created_",
+    "name": "API Created Project",
+    "path": "/tmp/pytest-of-fox/pytest-0/test_web_api_project_endpoints0/api_test_project",
+    "is_new": true,
+    "goal": "Inspect project",
+    "status": "INITIALIZED",
+    "created_at": 1791608840.48642,
+    "updated_at": 1791608840.4897003,
+    "milestones": [],
+    "tags": []
+  },
+  {
+    "id": "PROJ-1791608970-api_created_",
+    "name": "API Created Project",
+    "path": "/tmp/pytest-of-fox/pytest-1/test_web_api_project_endpoints0/api_test_project",
+    "is_new": true,
+    "goal": "Inspect project",
+    "status": "INITIALIZED",
+    "created_at": 1791608970.8300738,
+    "updated_at": 1791608970.8333743,
+    "milestones": [],
+    "tags": []
+  }
+]
